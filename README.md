@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/logo.png" alt="Kakachiex Realtime Canvas Logo" width="200" style="border-radius: 20%;" onerror="this.src='https://ui-avatars.com/api/?name=Kakachiex+Canvas&background=0D8ABC&color=fff&size=256&rounded=true'" />
+  <img src="src/assets/Kakachiex-01.png" alt="Kakachiex Realtime Canvas Logo" width="200" style="border-radius: 20%;" onerror="this.src='https://ui-avatars.com/api/?name=Kakachiex+Canvas&background=0D8ABC&color=fff&size=256&rounded=true'" />
 
   <h1>🎨 Kakachiex Realtime Canvas</h1>
   
