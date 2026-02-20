@@ -28,7 +28,7 @@ Whether you are sketching an industrial product, a glossy ceramic toy, or a neon
 <div align="center">
   <!-- Placeholder for a beautiful screenshot of the app -->
   <img src="./src/assets/Screenshot_20-2-2026_172945_localhost.jpeg" alt="App Screenshot Placeholder" width="100%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
-  <p><em>* Replace with an actual screenshot of the Split/Merge workspace.</em></p>
+  <p><em>Kakachiex Realtime Canvas.</em></p>
 </div>
 <br />
 
