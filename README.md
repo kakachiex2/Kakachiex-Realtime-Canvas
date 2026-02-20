@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/Kakachiex-01.png" alt="Kakachiex Realtime Canvas Logo" width="200" style="border-radius: 20%;" onerror="this.src='https://ui-avatars.com/api/?name=Kakachiex+Canvas&background=0D8ABC&color=fff&size=256&rounded=true'" />
+  <img src="src/assets/logo.png" alt="Kakachiex Realtime Canvas Logo" width="200" style="border-radius: 20%;" onerror="this.src='https://ui-avatars.com/api/?name=Kakachiex+Canvas&background=0D8ABC&color=fff&size=256&rounded=true'" />
 
   <h1>🎨 Kakachiex Realtime Canvas</h1>
   
@@ -8,7 +8,7 @@
   </p>
 
   <p>
-    <a href="https://reactjs.org/"><img src="./src/assets//Screenshot_20-2-2026_172945_localhost.jpeg" alt="React" /></a>
+    <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" /></a>
     <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" /></a>
     <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E" alt="Vite" /></a>
     <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" /></a>
