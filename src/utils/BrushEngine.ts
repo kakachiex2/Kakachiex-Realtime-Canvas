@@ -5,7 +5,7 @@ import { MypaintBrush, MypaintSurface, BRUSH, ColorRGB } from '../vendor/brushli
 // We need to map the brush names to their JSON content.
 // Since we are in Vite, we can use glob import to get all json files.
 const brushModules = import.meta.glob('../vendor/brushlib/brushes/*.myb.json', { eager: true });
-const brushImages = import.meta.glob('../vendor/brushlib/brushes/*_prev.png', { eager: true, as: 'url' });
+const brushImages = import.meta.glob('../vendor/brushlib/brushes/*_prev.png', { eager: true, query: '?url', import: 'default' });
 
 export interface BrushPreset {
     name: string;
@@ -55,7 +55,7 @@ export class BrushEngine {
             // path is like ../vendor/brushlib/brushes/brush.myb.json
             // image is like ../vendor/brushlib/brushes/brush_prev.png
             const imagePath = path.replace('.myb.json', '_prev.png');
-            const preview = brushImages[imagePath];
+            const preview = brushImages[imagePath] as string | undefined;
 
             loaded.push({
                 name,
