@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/logo.png" alt="Kakachiex Realtime Canvas Logo" width="200" style="border-radius: 20%;" onerror="this.src='https://ui-avatars.com/api/?name=Kakachiex+Canvas&background=0D8ABC&color=fff&size=256&rounded=true'" />
+  <img src="src/assets/Kakachiex-01.png" alt="Kakachiex Realtime Canvas Logo" width="200" style="border-radius: 20%;" onerror="this.src='https://ui-avatars.com/api/?name=Kakachiex+Canvas&background=0D8ABC&color=fff&size=256&rounded=true'" />
 
   <h1>🎨 Kakachiex Realtime Canvas</h1>
   
@@ -27,7 +27,7 @@ Whether you are sketching an industrial product, a glossy ceramic toy, or a neon
 <br />
 <div align="center">
   <!-- Placeholder for a beautiful screenshot of the app -->
-  <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop" alt="App Screenshot Placeholder" width="100%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+  <img src="./src/assets/Screenshot_20-2-2026_172945_localhost.jpeg" alt="App Screenshot Placeholder" width="100%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
   <p><em>* Replace with an actual screenshot of the Split/Merge workspace.</em></p>
 </div>
 <br />
