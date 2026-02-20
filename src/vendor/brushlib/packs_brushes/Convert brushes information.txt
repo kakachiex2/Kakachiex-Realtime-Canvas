@@ -1,0 +1,27 @@
+Information on formatting files:
+================================
+
+Place brushes files here directory, format brushes '*.myb' and image format '*.png' (image optional),
+or place a folder with brushes to divide into categories.
+
+----------INFO-------------
+If you put inside folder 'packs_brushes' after conversion, the brushes will fall into the 'brushes' category.
+
+Structures:
+    ./packs_brushes/
+        - short_grass.myb, short_grass_prev.png, ...
+
+    category = brushes
+---------------------------
+
+If you put a folder with brushes into the 'packs_brushes' folder,
+the name of the folder will become the category where the brushes will be located
+
+Structures:
+    ./packs_brushes/Classic
+        - watercolor.myb, watercolor_prev.png, ...
+
+    category = Classic
+---------------------------
+
+Note: All avaiables categories written inside file 'brushes_data.json' (automatic generated after converted)

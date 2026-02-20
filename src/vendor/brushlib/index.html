@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width , initial-scale=1.0" />
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <script src="js/mybrush.js"></script>
+  <script src="js/main.js"></script>
+</head>
+
+<body>
+  <div class="box">
+    <div class="column">
+      <div class="box__canvas"></div>
+      <div>
+        <a href="https://github.com/yapcheahshen/brushlib.js">MyPaint BrushLib in Javascript </a>
+        <embed name="wacom-plugin" id="wacom-plugin" type="application/x-wacom-tablet" hidden></embed>
+      </div>
+      <div>
+        <button id="cls_canvas">CLEAR CANVAS</button>
+      </div>
+    </div>
+    <div class="column">
+      <div class="row option select__brush">
+        <div class="option__label">Brushes:</div>
+        <div class="option__input">
+          <div>
+            <select id="brushselector">
+            </select>
+          </div>
+        </div>
+        <div class="image__brush">
+          <img src="/brushlib.js/assets/img/image_invalid.svg" alt="Brush Image" id="brush_img"
+            onerror="this.src = '/brushlib.js/assets/img/image_invalid.svg'">
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">Pressure for Mouse:</div>
+        <div class="option__input">
+          <input type="range" id="mousepressure" min="1" max="100" value="75" /><span>0.75</span>
+
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">Brush size:</div>
+        <div class="option__input">
+          <input type="range" id="brushsize" min="0.2" max="7" value="0" step="0.01" /><span>0</span>
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">Brush color:</div>
+        <div class="option__input">
+          <input type="color" id="brushcolor" />RGB: <span></span> | HSV: <span></span>
+          <p>
+            Brush name: <span id="colorbox"></span>
+          </p>
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">Hue:</div>
+        <div class="option__input">
+          <input type="range" id="color_h" min="1" max="100" value="0" /><span>0</span>
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">Sat</div>
+        <div class="option__input">
+          <input type="range" id="color_s" min="1" max="100" value="0" /><span>0</span>
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">Vue</div>
+        <div class="option__input"><input type="range" id="color_v" min="1" max="100" value="0" /><span>0</span>
+        </div>
+      </div>
+      <div class="row option">
+        <div class="option__label">dabs:</div>
+        <div class="option__input"><span id="dab_count"></span></div>
+      </div>
+      <div class="row option">
+        <div class="option__label">getcolor:</div>
+        <div class="option__input"><span id="getcolor_count"></span></div>
+      </div>
+      <div class="row option">
+        <div class="option__label">elapse:</div>
+        <div class="option__input"><span id="divelapse"></span></div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

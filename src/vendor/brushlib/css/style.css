@@ -1,0 +1,46 @@
+body {
+  background: silver;
+}
+
+canvas {
+  touch-action: none;
+  user-select: none;
+  width: 100%;
+}
+
+.box {
+  max-width: 800px;
+}
+
+.box,
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.row {
+  display: flex;
+  gap: 5px;
+}
+
+.option__label {
+  background: gainsboro;
+  padding: 3px;
+  flex: 1 1 30%;
+}
+
+.option__input {
+  text-align: center;
+  background: darkgray;
+  flex: 1 1 70%;
+}
+
+.select__brush {
+  align-items: center;
+  gap: 20px;
+}
+
+.image__brush {
+  min-width: 100px;
+}

@@ -1,0 +1,29 @@
+{
+  "brushes": {
+    "items": [
+      "b000",
+      "brush",
+      "calligraphy",
+      "charcoal",
+      "coarse_bulk_1",
+      "eraser",
+      "fur",
+      "glow",
+      "impressionism",
+      "leaves",
+      "maobi",
+      "pen",
+      "pencil",
+      "sewing",
+      "short_grass",
+      "short_grass",
+      "texture_03",
+      "texture_06",
+      "watercolor"
+    ],
+    "path": "/",
+    "settings": {
+      "enabled": true
+    }
+  }
+}

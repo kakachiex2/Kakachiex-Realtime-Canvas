@@ -1,0 +1,126 @@
+got prompt
+Requested to load AutoencoderKL
+0 models unloaded.
+loaded partially; 0.00 MB usable, 0.00 MB loaded, 320.61 MB offloaded, 27.01 MB buffer reserved, lowvram patches: 0
+Requested to load Flux2
+loaded partially; 1181.66 MB usable, 918.76 MB loaded, 3290.62 MB offloaded, 258.19 MB buffer reserved, lowvram patches: 0
+  0%|          | 0/6 [00:00<?, ?it/s]
+!!! Exception during processing !!! mat1 and mat2 shapes cannot be multiplied (512x12288 and 7680x3072)
+Traceback (most recent call last):
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\execution.py", line 530, in execute
+    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\execution.py", line 334, in get_output_data
+    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\execution.py", line 308, in _async_map_node_over_list
+    await process_inputs(input_dict, i)
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\execution.py", line 296, in process_inputs
+    result = f(**inputs)
+             ^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy_api\internal\__init__.py", line 149, in wrapped_func
+    return method(locked_class, **inputs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy_api\latest\_io.py", line 1716, in EXECUTE_NORMALIZED
+    to_return = cls.execute(*args, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy_extras\nodes_custom_sampler.py", line 963, in execute
+    samples = guider.sample(noise.generate_noise(latent), latent_image, sampler, sigmas, denoise_mask=noise_mask, callback=callback, disable_pbar=disable_pbar, seed=noise.seed)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 1049, in sample
+    output = executor.execute(noise, latent_image, sampler, sigmas, denoise_mask, callback, disable_pbar, seed, latent_shapes=latent_shapes)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\patcher_extension.py", line 112, in execute
+    return self.original(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 993, in outer_sample
+    output = self.inner_sample(noise, latent_image, device, sampler, sigmas, denoise_mask, callback, disable_pbar, seed, latent_shapes=latent_shapes)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 979, in inner_sample
+    samples = executor.execute(self, sigmas, extra_args, callback, noise, latent_image, denoise_mask, disable_pbar)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\patcher_extension.py", line 112, in execute
+    return self.original(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 751, in sample
+    samples = self.sampler_function(model_k, noise, sigmas, extra_args=extra_args, callback=k_callback, disable=disable_pbar, **self.extra_options)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\.venv\Lib\site-packages\torch\utils\_contextlib.py", line 120, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\k_diffusion\sampling.py", line 205, in sample_euler
+    denoised = model(x, sigma_hat * s_in, **extra_args)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 400, in __call__
+    out = self.inner_model(x, sigma, model_options=model_options, seed=seed)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 952, in __call__
+    return self.outer_predict_noise(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 959, in outer_predict_noise
+    ).execute(x, timestep, model_options, seed)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\patcher_extension.py", line 112, in execute
+    return self.original(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 962, in predict_noise
+    return sampling_function(self.inner_model, x, timestep, self.conds.get("negative", None), self.conds.get("positive", None), self.cfg, model_options=model_options, seed=seed)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 380, in sampling_function
+    out = calc_cond_batch(model, conds, x, timestep, model_options)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 205, in calc_cond_batch
+    return _calc_cond_batch_outer(model, conds, x_in, timestep, model_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 213, in _calc_cond_batch_outer
+    return executor.execute(model, conds, x_in, timestep, model_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\patcher_extension.py", line 112, in execute
+    return self.original(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\samplers.py", line 325, in _calc_cond_batch
+    output = model.apply_model(input_x, timestep_, **c).chunk(batch_chunks)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\model_base.py", line 167, in apply_model
+    return comfy.patcher_extension.WrapperExecutor.new_class_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\patcher_extension.py", line 112, in execute
+    return self.original(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\model_base.py", line 206, in _apply_model
+    model_output = self.diffusion_model(xc, t, context=context, control=control, transformer_options=transformer_options, **extra_conds)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\ldm\flux\model.py", line 301, in forward
+    return comfy.patcher_extension.WrapperExecutor.new_class_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\patcher_extension.py", line 112, in execute
+    return self.original(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\ldm\flux\model.py", line 352, in _forward
+    out = self.forward_orig(img, img_ids, context, txt_ids, timestep, y, guidance, control, transformer_options, attn_mask=kwargs.get("attention_mask", None))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\custom_nodes\comfyui-flux2fun-controlnet\flux_patch.py", line 106, in patched_forward_orig
+    txt = self.txt_in(txt)
+          ^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\AppData\Local\Programs\@comfyorgcomfyui-electron\resources\ComfyUI\comfy\ops.py", line 360, in forward
+    return self.forward_comfy_cast_weights(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\custom_nodes\ComfyUI-GGUF\ops.py", line 215, in forward_comfy_cast_weights
+    out = self.forward_ggml_cast_weights(input, *args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rafae\Documents\ComfyUI\custom_nodes\ComfyUI-GGUF\ops.py", line 244, in forward_ggml_cast_weights
+    return torch.nn.functional.linear(input, weight, bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (512x12288 and 7680x3072)

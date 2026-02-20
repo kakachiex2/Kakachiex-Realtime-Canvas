@@ -1,0 +1,21 @@
+{
+  "name": "brushlib",
+  "version": "1.0.0",
+  "description": "MyPaint brushlib in Javascript",
+  "main": "brushConvert.js",
+  "scripts": {
+    "convert": "node brushConverter.js convert",
+    "brushes": "node brushConverter brushes",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlekPet/brushlib.js.git"
+  },
+  "author": "AlekPet",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AlekPet/brushlib.js/issues"
+  },
+  "homepage": "https://github.com/AlekPet/brushlib.js#readme"
+}

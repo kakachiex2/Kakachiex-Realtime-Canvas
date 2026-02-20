@@ -1,0 +1,58 @@
+EXPAND START
+Iteration 1, nodes: 5
+Expanding node 109 type 757e3291-104c-401e-8f24-d99b5f011a25
+Found defInput for image: {"id":"a5d88bb2-b28a-4739-93ba-9b82ffe0c601","name":"image","type":"IMAGE","linkIds":[207],"localized_name":"image","label":":: | Img_R1 | ::","pos":[192.57182671277295,509.9828992167592]}
+  Internal link 207 points to RawNode 110 -> NewNode 1127 Slot 0
+  Found External Link 205: [205,100,0,109,0,"IMAGE"]
+  -> Connected! Link 205 to NewNode 1127 Slot 0
+  -> Updated Node 1127 input 0 link to 205
+Found defInput for image_1: {"id":"35f63ac3-33e3-438c-b83d-ff9debbb478f","name":"image_1","type":"IMAGE","linkIds":[202],"localized_name":"image_1","label":":: | Img_R2 | ::","pos":[192.57182671277295,529.9828992167593]}
+  Internal link 202 points to RawNode 109 -> NewNode 1126 Slot 0
+  Found External Link 257: [257,106,0,109,1,"IMAGE"]
+  -> Connected! Link 257 to NewNode 1126 Slot 0
+  -> Updated Node 1126 input 0 link to 257
+Iteration 2, nodes: 23
+Expanding node 1124 type 6d714007-01d7-416d-ad44-ba52c73fe853
+Found defInput for conditioning: {"id":"5c9a0f5e-8cee-4947-90bc-330de782043a","name":"conditioning","type":"CONDITIONING","linkIds":[165],"label":"positive","pos":[-222,1210]}
+  Internal link 165 points to RawNode 77 -> NewNode 1132 Slot 0
+  Found External Link 1270: [1270,1122,0,1124,0,"CONDITIONING"]
+  -> Connected! Link 1270 to NewNode 1132 Slot 0
+  -> Updated Node 1132 input 0 link to 1270
+Found defInput for conditioning_1: {"id":"61826d46-4c21-4ad6-801c-3e3fa94115e2","name":"conditioning_1","type":"CONDITIONING","linkIds":[166],"label":"negative","pos":[-222,1230]}
+  Internal link 166 points to RawNode 76 -> NewNode 1130 Slot 0
+  Found External Link 1271: [1271,1114,0,1124,1,"CONDITIONING"]
+  -> Connected! Link 1271 to NewNode 1130 Slot 0
+  -> Updated Node 1130 input 0 link to 1271
+Found defInput for pixels: {"id":"345bf085-5939-47ff-9767-8f8f239a719c","name":"pixels","type":"IMAGE","linkIds":[167],"pos":[-222,1250]}
+  Internal link 167 points to RawNode 78 -> NewNode 1131 Slot 0
+  Found External Link 1281: [1281,1129,0,1124,2,"IMAGE"]
+  -> Connected! Link 1281 to NewNode 1131 Slot 0
+  -> Updated Node 1131 input 0 link to 1281
+Found defInput for vae: {"id":"f4594e34-e2f5-4f1e-b1fa-a1dc2aeb0a90","name":"vae","type":"VAE","linkIds":[168],"pos":[-222,1270]}
+  Internal link 168 points to RawNode 78 -> NewNode 1131 Slot 1
+  Found External Link 1272: [1272,1117,0,1124,3,"VAE"]
+  -> Connected! Link 1272 to NewNode 1131 Slot 1
+  -> Updated Node 1131 input 1 link to 1272
+Iteration 3, nodes: 25
+Expanding node 1125 type 9be448e1-3cb9-4707-b587-7e8658a22bc0
+Found defInput for conditioning: {"id":"5c9a0f5e-8cee-4947-90bc-330de782043a","name":"conditioning","type":"CONDITIONING","linkIds":[165],"label":"positive","pos":[-222,1210]}
+  Internal link 165 points to RawNode 77 -> NewNode 1135 Slot 0
+  Found External Link 1273: [1273,1132,0,1125,0,"CONDITIONING"]
+  -> Connected! Link 1273 to NewNode 1135 Slot 0
+  -> Updated Node 1135 input 0 link to 1273
+Found defInput for conditioning_1: {"id":"61826d46-4c21-4ad6-801c-3e3fa94115e2","name":"conditioning_1","type":"CONDITIONING","linkIds":[166],"label":"negative","pos":[-222,1230]}
+  Internal link 166 points to RawNode 76 -> NewNode 1133 Slot 0
+  Found External Link 1274: [1274,1130,0,1125,1,"CONDITIONING"]
+  -> Connected! Link 1274 to NewNode 1133 Slot 0
+  -> Updated Node 1133 input 0 link to 1274
+Found defInput for pixels: {"id":"345bf085-5939-47ff-9767-8f8f239a719c","name":"pixels","type":"IMAGE","linkIds":[167],"pos":[-222,1250]}
+  Internal link 167 points to RawNode 78 -> NewNode 1134 Slot 0
+  Found External Link 1277: [1277,1128,0,1125,2,"IMAGE"]
+  -> Connected! Link 1277 to NewNode 1134 Slot 0
+  -> Updated Node 1134 input 0 link to 1277
+Found defInput for vae: {"id":"f4594e34-e2f5-4f1e-b1fa-a1dc2aeb0a90","name":"vae","type":"VAE","linkIds":[168],"pos":[-222,1270]}
+  Internal link 168 points to RawNode 78 -> NewNode 1134 Slot 1
+  Found External Link 1275: [1275,1117,0,1125,3,"VAE"]
+  -> Connected! Link 1275 to NewNode 1134 Slot 1
+  -> Updated Node 1134 input 1 link to 1275
+Iteration 4, nodes: 27

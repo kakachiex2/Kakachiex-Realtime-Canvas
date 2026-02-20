@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<SCRIPT src="js/mybrush.js"></SCRIPT>
+
+<BODY bgcolor=silver>
+	dabs:<span id="dab_count"></span>
+	<br>getcolor:<span id="getcolor_count"></span>
+	<br>elapse:<span id="divelapse"></span>
+	<br><CANVAS width=500 height=500 id=thecanvas></CANVAS>
+	<SCRIPT>
+
+		async function getBrushSetting(pathToBrush) {
+			const brushGetData = await fetch(`/brushlib.js/${pathToBrush}`);
+			const brushSetting = await brushGetData.json();
+
+			return brushSetting;
+		}
+
+		function drawsinwave(brush, surface) {
+			var i, steps, xstep;
+			var p, ydelta;
+			width = 500; height = 500;
+			brush.new_stroke();
+			steps = 20;
+			xstep = Math.ceil(width / steps);
+			ydelta = 0;
+			for (var i = 0; i < steps; i++) {
+				p = Math.sin((180) * (i / steps) * Math.PI / 180) * 1;
+				ydelta = Math.sin((-360) * (i / steps) * Math.PI / 180) * (height / 6);
+				brush.stroke_to(surface, i * xstep, (height / 2) + ydelta, p, 0, 0, 0.1);
+			}
+		}
+
+		async function init() {
+			const brushSetting = await getBrushSetting('brushes/charcoal.myb.json')
+			t1 = (new Date()).getTime();
+			var surface = new MypaintSurface("thecanvas");
+
+			var brush = new MypaintBrush(brushSetting, surface);
+			drawsinwave(brush, surface);
+			dab_count.innerHTML = surface.dab_count;
+			getcolor_count.innerHTML = surface.getcolor_count;
+
+			divelapse.innerHTML = (new Date()).getTime() - t1;
+		}
+		init()
+	</SCRIPT>
+</BODY>
+
+</HTML>
