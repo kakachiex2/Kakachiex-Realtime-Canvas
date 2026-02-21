@@ -236,12 +236,12 @@ function App() {
 
         {/* Output Area */}
         <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full border-l border-white/10 p-8' : 'absolute w-full h-full top-0 left-0 z-0 bg-muted/20'} flex items-center justify-center`}>
-            <div className={`relative flex items-center justify-center overflow-hidden ${viewMode === 'merge' ? 'w-1/2 h-full' : 'w-full h-full rounded-md shadow-md border border-white/10 bg-background/50'}`}>
+            <div className={`relative flex items-center justify-center overflow-hidden ${viewMode === 'merge' ? 'w-1/2 h-full' : 'w-full h-full rounded-md shadow-md border border-red-500 bg-background/50'}`}>
                {activeProvider === 'comfy' && comfy.lastImage && (
-                   <img src={comfy.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="ComfyUI Output" />
+                   <img src={comfy.lastImage} className={`w-full h-full object-cover ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="ComfyUI Output" />
                )}
                {activeProvider === 'fal' && fal.lastImage && (
-                   <img src={fal.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="Fal Output" />
+                   <img src={fal.lastImage} className={`w-full h-full object-cover ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="Fal Output" />
                )}
                {(!comfy.lastImage && !fal.lastImage) && (
                    <div className="text-muted-foreground opacity-50">Draw to generate</div>
