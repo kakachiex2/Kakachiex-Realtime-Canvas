@@ -1,7 +1,68 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { BrushEngine, type BrushPreset } from "../utils/BrushEngine";
 import { Button } from "./ui/button";
 import { X } from "lucide-react";
+
+function BrushPreview({ brushName }: { brushName: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<BrushEngine | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (!engineRef.current) {
+        engineRef.current = new BrushEngine(canvas);
+    }
+    const engine = engineRef.current;
+    
+    // Provide a fixed resolution for crisp drawing that scales to the container
+    canvas.width = 240;
+    canvas.height = 40;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    engine.setBrush(brushName);
+    engine.setColor(0, 0, 0); // Black, which will be inverted in dark mode
+    engine.setOpacity(1.0);
+    engine.setBrushSize(5);
+
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    const startX = w * 0.1;
+    const endX = w * 0.9;
+    const midY = h / 2;
+    
+    engine.startStroke(startX, midY);
+    
+    const steps = 40;
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        
+        const p0 = { x: startX, y: midY };
+        const p1 = { x: w * 0.3, y: h * -0.5 };
+        const p2 = { x: w * 0.7, y: h * 1.5 };
+        const p3 = { x: endX, y: midY };
+
+        const xt = Math.pow(1-t, 3)*p0.x + 3*Math.pow(1-t, 2)*t*p1.x + 3*(1-t)*t*t*p2.x + Math.pow(t, 3)*p3.x;
+        const yt = Math.pow(1-t, 3)*p0.y + 3*Math.pow(1-t, 2)*t*p1.y + 3*(1-t)*t*t*p2.y + Math.pow(t, 3)*p3.y;
+
+        const pressure = Math.sin(t * Math.PI) * 0.8 + 0.2; 
+
+        engine.strokeTo(xt, yt, pressure, 0.05);
+    }
+
+  }, [brushName]);
+
+  return (
+    <canvas 
+        ref={canvasRef} 
+        className="w-full h-full object-contain opacity-80 dark:invert"
+    />
+  );
+}
 
 interface BrushLibraryProps {
   isOpen: boolean;
@@ -65,11 +126,7 @@ export function BrushLibrary({ isOpen, onClose, onSelectBrush, activeBrush }: Br
                         </div>
                         {/* Preview Stroke */}
                         <div className="h-8 w-full bg-muted/50 rounded overflow-hidden border border-border/50">
-                            {brush.preview ? (
-                                <img src={brush.preview} alt={brush.name} className="w-full h-full object-contain opacity-80 dark:invert" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-[9px] text-muted-foreground">No Preview</div>
-                            )}
+                            <BrushPreview brushName={brush.name} />
                         </div>
                     </div>
                 ))}

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - mybrush.js has no types
 import { MypaintBrush, MypaintSurface, BRUSH, ColorRGB } from '../vendor/brushlib/js/mybrush.js';
 
@@ -26,6 +26,10 @@ export class BrushEngine {
     private surface: MypaintSurface;
     private brush: MypaintBrush | null = null;
     public static presets: BrushPreset[] = [];
+    
+    // Store original preset base values to scale relative to them
+    private defaultBaseRadius: number = 0;
+    private defaultBaseOpacity: number = 1;
 
     constructor(canvas: HTMLCanvasElement) {
         this.surface = new MypaintSurface(canvas);
@@ -70,6 +74,10 @@ export class BrushEngine {
     public setBrush(name: string) {
         const preset = BrushEngine.presets.find(p => p.name === name);
         if (preset) {
+            // Save original base values so we can apply relative scaling
+            this.defaultBaseRadius = preset.setting[BRUSH.RADIUS_LOGARITHMIC]?.base_value ?? 0;
+            this.defaultBaseOpacity = preset.setting[BRUSH.OPAQUE]?.base_value ?? 1;
+
             this.brush = new MypaintBrush(preset.setting, this.surface);
         }
     }
@@ -86,11 +94,16 @@ export class BrushEngine {
 
     public setBrushSize(size: number) {
         if (!this.brush) return;
-        // Map simplified size (e.g. 1-100) to logarithmic radius
-        // MyPaint radius is log.
-        // base_value = log(radius)
-        // If size is radius in pixels:
-        this.brush.settings[BRUSH.RADIUS_LOGARITHMIC].base_value = Math.log(size);
+        // The slider ranges 1-100. Let's make 10 = 1.0x native size.
+        // MyPaint radius is logarithmic, so scale is expressed by addition.
+        const scale = size / 10;
+        this.brush.settings[BRUSH.RADIUS_LOGARITHMIC].base_value = this.defaultBaseRadius + Math.log(scale);
+    }
+
+    public setOpacity(opacity: number) {
+        if (!this.brush) return;
+        // Multiply the user opacity (0 to 1) by the preset's native desired opacity
+        this.brush.settings[BRUSH.OPAQUE].base_value = this.defaultBaseOpacity * opacity;
     }
 
     public startStroke(x: number, y: number) {
@@ -100,7 +113,8 @@ export class BrushEngine {
 
     public strokeTo(x: number, y: number, pressure: number = 0.5, dtime: number = 0.1) {
         if (!this.brush) return;
-        this.brush.stroke_to(x, y, pressure, 0, 0, dtime);
+        // 90 xtilt was necessary to activate certain flat shaders nicely
+        this.brush.stroke_to(x, y, pressure, 90, 0, dtime);
     }
 
     public endStroke() {

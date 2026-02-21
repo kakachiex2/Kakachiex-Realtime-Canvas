@@ -5,6 +5,7 @@ import { SettingsDialog } from '@/components/SettingsDialog';
 import { RenderModeOverlay } from '@/components/RenderModeOverlay';
 import { CanvasArea, type CanvasAreaHandles } from '@/components/CanvasArea';
 import { CustomStyleWidget } from '@/components/CustomStyleWidget';
+import { BrushControlWidget } from '@/components/BrushControlWidget';
 import { useComfy } from '@/hooks/useComfy';
 import { useFal } from '@/hooks/useFal';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -33,6 +34,10 @@ function App() {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [activeBrush, setActiveBrush] = useState("pencil");
   const [activeCustomStyle, setActiveCustomStyle] = useState<string | null>(null);
+  const [brushSize, setBrushSize] = useState(3);
+  const [brushOpacity, setBrushOpacity] = useState(1.0);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   
   const [isDynamicRendering, setIsDynamicRendering] = useState(true);
 
@@ -58,6 +63,19 @@ function App() {
   const handleClear = () => {
     canvasRef.current?.clear();
   };
+
+  const handleHistoryChange = useCallback((undoable: boolean, redoable: boolean) => {
+    setCanUndo(undoable);
+    setCanRedo(redoable);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    canvasRef.current?.undo();
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    canvasRef.current?.redo();
+  }, []);
 
   const activeProvider = comfy.status === 'CONNECTED' ? 'comfy' : 'fal';
   const statusDisplay = activeProvider === 'comfy' ? comfy.status : fal.status;
@@ -165,6 +183,17 @@ function App() {
         }}
       />
       
+      <BrushControlWidget
+        brushSize={brushSize}
+        onBrushSizeChange={setBrushSize}
+        brushOpacity={brushOpacity}
+        onBrushOpacityChange={setBrushOpacity}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+      />
+      
       {activeProvider === 'comfy' && (
         <CustomStyleWidget
             activeStyleUrl={activeCustomStyle}
@@ -197,8 +226,10 @@ function App() {
                     ref={canvasRef} 
                     onDraw={onDraw} 
                     color={canvasColor} 
-                    brushSize={3}
+                    brushSize={brushSize}
                     activeBrush={activeBrush}
+                    opacity={brushOpacity}
+                    onHistoryChange={handleHistoryChange}
                 />
              </div>
         </div>

@@ -4,6 +4,8 @@ import { BrushEngine } from '../utils/BrushEngine';
 export interface CanvasAreaHandles {
   clear: () => void;
   getDataURL: () => string;
+  undo: () => void;
+  redo: () => void;
 }
 
 interface CanvasAreaProps {
@@ -11,13 +13,54 @@ interface CanvasAreaProps {
   color: string;
   brushSize: number;
   activeBrush?: string;
+  opacity?: number;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
 }
 
-export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDraw, color, brushSize, activeBrush }, ref) => {
+export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDraw, color, brushSize, activeBrush, opacity, onHistoryChange }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const brushEngineRef = useRef<BrushEngine | null>(null);
   const lastTime = useRef<number>(0);
+
+  const historyRef = useRef<ImageData[]>([]);
+  const historyStepRef = useRef<number>(-1);
+
+  const notifyHistory = () => {
+    if (onHistoryChange) {
+       onHistoryChange(historyStepRef.current > 0, historyStepRef.current < historyRef.current.length - 1);
+    }
+  };
+
+  const saveState = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+    
+    if (historyStepRef.current < historyRef.current.length - 1) {
+       historyRef.current = historyRef.current.slice(0, historyStepRef.current + 1);
+    }
+    
+    historyRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    if (historyRef.current.length > 30) {
+         historyRef.current.shift();
+    } else {
+         historyStepRef.current++;
+    }
+    notifyHistory();
+  };
+
+  const restoreState = (index: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const state = historyRef.current[index];
+    if (state) {
+        ctx.putImageData(state, 0, 0);
+    }
+  };
 
   useImperativeHandle(ref, () => ({
     clear: () => {
@@ -26,11 +69,11 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      saveState();
     },
     getDataURL: () => {
       const canvas = canvasRef.current;
       if (!canvas) return '';
-      // Composite white background
       const tmp = document.createElement('canvas');
       tmp.width = canvas.width;
       tmp.height = canvas.height;
@@ -41,24 +84,37 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
       ctx.fillRect(0, 0, tmp.width, tmp.height);
       ctx.drawImage(canvas, 0, 0);
       return tmp.toDataURL('image/jpeg', 0.8);
+    },
+    undo: () => {
+      if (historyStepRef.current > 0) {
+          historyStepRef.current--;
+          restoreState(historyStepRef.current);
+          notifyHistory();
+          onDraw();
+      }
+    },
+    redo: () => {
+      if (historyStepRef.current < historyRef.current.length - 1) {
+          historyStepRef.current++;
+          restoreState(historyStepRef.current);
+          notifyHistory();
+          onDraw();
+      }
     }
   }));
 
-  // Initialize Brush Engine
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     brushEngineRef.current = new BrushEngine(canvas);
   }, []);
 
-  // Update Brush
   useEffect(() => {
     if (brushEngineRef.current && activeBrush) {
       brushEngineRef.current.setBrush(activeBrush);
     }
   }, [activeBrush]);
 
-  // Update Color
   useEffect(() => {
     if (brushEngineRef.current && color) {
       const hex = color.replace('#', '');
@@ -75,7 +131,12 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     }
   }, [brushSize]);
 
-  // Resize Observer
+  useEffect(() => {
+    if (brushEngineRef.current && opacity !== undefined) {
+        brushEngineRef.current.setOpacity(opacity);
+    }
+  }, [opacity]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -83,32 +144,31 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     const resize = () => {
       const parent = canvas.parentElement;
       if (parent) {
-        // Save current content
         const data = canvas.toDataURL();
         const ctx = canvas.getContext('2d');
         
         canvas.width = parent.clientWidth;
         canvas.height = parent.clientHeight;
         
-        // Restore content
         const img = new Image();
         img.src = data;
         img.onload = () => {
            if (ctx) ctx.drawImage(img, 0, 0);
+           // If history is completely empty after resize, initialize it
+           if (historyRef.current.length === 0) {
+               saveState();
+           }
         }
       }
     };
     
-    // Initial resize
     resize();
-
     const parent = canvas.parentElement;
     if (!parent) return;
 
     const observer = new ResizeObserver(() => {
         resize();
     });
-    
     observer.observe(parent);
 
     return () => observer.disconnect();
@@ -129,19 +189,17 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     isDrawing.current = true;
     lastTime.current = performance.now() / 1000;
     
+    if (historyRef.current.length === 0) {
+        saveState();
+    }
+
     const pos = getPos(e);
-    // Use pressure if available and > 0, otherwise default. 
-    // Some devices report 0 on start? 
-    // PointerEvent spec says pressure is 0.5 for devices without pressure.
     let pressure = e.pressure;
-    if (e.pointerType === 'mouse' && e.buttons !== 1) return; // Only left click logic
+    if (e.pointerType === 'mouse' && e.buttons !== 1) return;
     if (pressure === 0 && e.pointerType === 'mouse') pressure = 0.5;
 
     brushEngineRef.current?.startStroke(pos.x, pos.y);
-    // Also do a strokeTo immediately to draw a dot?
     brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, 0.1); 
-    
-    // onDraw(); 
   };
 
   const draw = (e: React.PointerEvent) => {
@@ -153,7 +211,7 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
 
     const now = performance.now() / 1000;
     let dt = now - lastTime.current;
-    if (dt <= 0) dt = 0.001; // Avoid zero div if called too fast
+    if (dt <= 0) dt = 0.001;
 
     brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, dt);
     
@@ -164,7 +222,8 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     if (isDrawing.current) {
         canvasRef.current?.releasePointerCapture(e.pointerId);
         isDrawing.current = false;
-        onDraw(); // Trigger generation only when stroke finishes
+        saveState();
+        onDraw(); 
     }
   };
 
