@@ -174,15 +174,23 @@ export function useComfy(): UseComfyReturn {
     }
 
     // Update Prompt (CLIPTextEncode)
-    for (const node of Object.values(workflow) as any[]) {
-      if (node.class_type === "CLIPTextEncode" && typeof node.inputs?.text === "string") {
-         node.inputs.text = prompt;
+    for (const [key, node] of Object.entries(workflow)) {
+      const n = node as any;
+      if (n.class_type === "CLIPTextEncode" && typeof n.inputs?.text === "string") {
+         if (key === "175") {
+             // Inject custom style prompt for the concatenate conditioning node
+             n.inputs.text = "Use image 2 as an style render reference.";
+         } else if (key === "97" || !n.inputs.text || n.inputs.text === "") {
+             // Node 97 is the positive prompt in defaultWorkflow. 
+             // Apply the user's prompt to node 97 or any empty text encode to be safe.
+             n.inputs.text = prompt;
+         }
       }
       
       // Update Seed
-      if (node.class_type === "KSampler" || node.class_type === "SamplerCustom") {
-        if (node.inputs.seed !== undefined) {
-          node.inputs.seed = Math.floor(Math.random() * 1000000000);
+      if (n.class_type === "KSampler" || n.class_type === "SamplerCustom") {
+        if (n.inputs.seed !== undefined) {
+          n.inputs.seed = Math.floor(Math.random() * 1000000000);
         }
       }
     }

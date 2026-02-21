@@ -12,7 +12,7 @@ import { defaultWorkflow } from './defaultWorkflow';
 
 const PRESETS: Record<string, string> = {
   studio: "product design sketch material, industrial design material, clean lighting, realistic material, white soft illumination background",
-  toy: "plastic toy material render, smooth plastic material, white soft illumination background",
+  toy: "plastic toy material render, smooth shiny plastic material, white soft illumination background",
   ceramic: "handcrafted ceramic material render, matte glaze, subtle imperfections, white soft illumination background",
   plush: "soft plush fabric material render, stitched seams, cozy toy aesthetic, white soft illumination background",
   wood: "carved wooden material render, natural wood grain texture, warm studio lighting, realistic product shot, white soft illumination background",
@@ -177,7 +177,7 @@ function App() {
 
       <div className={`flex-1 flex ${viewMode === 'split' ? 'flex-row' : 'flex-col'} relative min-h-0`}>
         {/* Input Area */}
-        <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full' : 'absolute w-full h-full top-0 left-0 z-10 pointer-events-none'}`}>
+        <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full' : 'absolute w-1/2 h-full top-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none'}`}>
              
              {/* Render Mode Overlay */}
              <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-20">
@@ -204,13 +204,13 @@ function App() {
         </div>
 
         {/* Output Area */}
-        <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full border-l border-white/10 p-8' : 'absolute w-full h-full top-0 left-0 z-0'} bg-muted/20 flex items-center justify-center`}>
-            <div className={`relative flex items-center justify-center w-full h-full overflow-hidden ${viewMode === 'merge' ? '' : 'rounded-md shadow-xl border border-white/10 bg-background/50'}`}>
+        <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full border-l border-white/10 p-8' : 'absolute w-full h-full top-0 left-0 z-0 bg-muted/20'} flex items-center justify-center`}>
+            <div className={`relative flex items-center justify-center overflow-hidden ${viewMode === 'merge' ? 'w-1/2 h-full' : 'w-full h-full rounded-md shadow-md border border-white/10 bg-background/50'}`}>
                {activeProvider === 'comfy' && comfy.lastImage && (
-                   <img src={comfy.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-3xl'}`} alt="ComfyUI Output" />
+                   <img src={comfy.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="ComfyUI Output" />
                )}
                {activeProvider === 'fal' && fal.lastImage && (
-                   <img src={fal.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-3xl'}`} alt="Fal Output" />
+                   <img src={fal.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="Fal Output" />
                )}
                {(!comfy.lastImage && !fal.lastImage) && (
                    <div className="text-muted-foreground opacity-50">Draw to generate</div>
