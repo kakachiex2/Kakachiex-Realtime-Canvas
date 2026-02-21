@@ -4,6 +4,7 @@ import { BrushLibrary } from '@/components/BrushLibrary';
 import { SettingsDialog } from '@/components/SettingsDialog';
 import { RenderModeOverlay } from '@/components/RenderModeOverlay';
 import { CanvasArea, type CanvasAreaHandles } from '@/components/CanvasArea';
+import { CustomStyleWidget } from '@/components/CustomStyleWidget';
 import { useComfy } from '@/hooks/useComfy';
 import { useFal } from '@/hooks/useFal';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -31,6 +32,7 @@ function App() {
   const [toolbarPosition, setToolbarPosition] = useState<"top" | "bottom">("bottom");
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [activeBrush, setActiveBrush] = useState("pencil");
+  const [activeCustomStyle, setActiveCustomStyle] = useState<string | null>(null);
   
   const [isDynamicRendering, setIsDynamicRendering] = useState(true);
 
@@ -74,7 +76,11 @@ function App() {
         
         if (baseWorkflow) {
              const blob = await (await fetch(dataUrl)).blob();
-             await comfy.runWorkflow(baseWorkflow, blob, prompt);
+             let styleBlob: Blob | undefined = undefined;
+             if (activeCustomStyle) {
+                 styleBlob = await (await fetch(activeCustomStyle)).blob();
+             }
+             await comfy.runWorkflow(baseWorkflow, blob, prompt, styleBlob);
         }
       } catch (e) {
         console.error("Comfy Gen Error", e);
@@ -86,7 +92,7 @@ function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePreset, activeProvider, comfy.runWorkflow, fal.send]);
+  }, [activePreset, activeProvider, comfy.runWorkflow, fal.send, activeCustomStyle]);
 
   const onDraw = useCallback(() => {
     if (!isDynamicRendering) return; // Block auto-generation if not dynamic
@@ -158,6 +164,16 @@ function App() {
           // setIsLibraryOpen(false);
         }}
       />
+      
+      {activeProvider === 'comfy' && (
+        <CustomStyleWidget
+            activeStyleUrl={activeCustomStyle}
+            onSelectStyle={(url) => {
+                 setActiveCustomStyle(url);
+                 if (isDynamicRendering) generate();
+            }}
+        />
+      )}
 
       <div className={`flex-1 flex ${viewMode === 'split' ? 'flex-row' : 'flex-col'} relative min-h-0`}>
         {/* Input Area */}
@@ -188,16 +204,18 @@ function App() {
         </div>
 
         {/* Output Area */}
-        <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full border-l border-white/10' : 'absolute w-full h-full top-0 left-0 z-0'} bg-muted/20 flex items-center justify-center`}>
-           {activeProvider === 'comfy' && comfy.lastImage && (
-               <img src={comfy.lastImage} className="max-w-full max-h-full object-contain" alt="ComfyUI Output" />
-           )}
-           {activeProvider === 'fal' && fal.lastImage && (
-               <img src={fal.lastImage} className="max-w-full max-h-full object-contain" alt="Fal Output" />
-           )}
-           {(!comfy.lastImage && !fal.lastImage) && (
-               <div className="text-muted-foreground opacity-50">Draw to generate</div>
-           )}
+        <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full border-l border-white/10 p-8' : 'absolute w-full h-full top-0 left-0 z-0'} bg-muted/20 flex items-center justify-center`}>
+            <div className={`relative flex items-center justify-center w-full h-full overflow-hidden ${viewMode === 'merge' ? '' : 'rounded-md shadow-xl border border-white/10 bg-background/50'}`}>
+               {activeProvider === 'comfy' && comfy.lastImage && (
+                   <img src={comfy.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-3xl'}`} alt="ComfyUI Output" />
+               )}
+               {activeProvider === 'fal' && fal.lastImage && (
+                   <img src={fal.lastImage} className={`w-full h-full object-contain ${viewMode === 'merge' ? '' : 'rounded-3xl'}`} alt="Fal Output" />
+               )}
+               {(!comfy.lastImage && !fal.lastImage) && (
+                   <div className="text-muted-foreground opacity-50">Draw to generate</div>
+               )}
+            </div>
         </div>
       </div>
     </div>

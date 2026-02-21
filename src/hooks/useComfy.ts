@@ -14,7 +14,7 @@ interface UseComfyReturn {
   host: string;
   connect: (hostUrl: string) => Promise<void>;
   disconnect: () => void;
-  runWorkflow: (baseWorkflow: ComfyWorkflow, imageBlob: Blob, prompt: string) => Promise<void>;
+  runWorkflow: (baseWorkflow: ComfyWorkflow, imageBlob: Blob, prompt: string, styleBlob?: Blob) => Promise<void>;
   lastImage: string | null;
 }
 
@@ -141,13 +141,17 @@ export function useComfy(): UseComfyReturn {
     return json.name;
   }, []);
 
-  const runWorkflow = useCallback(async (baseWorkflow: ComfyWorkflow, imageBlob: Blob, prompt: string) => {
+  const runWorkflow = useCallback(async (baseWorkflow: ComfyWorkflow, imageBlob: Blob, prompt: string, styleBlob?: Blob) => {
     if (status !== 'CONNECTED' || !clientId) {
       throw new Error("ComfyUI not connected");
     }
 
-    // 1. Upload Image
+    // 1. Upload Images
     const filename = await uploadImage(imageBlob);
+    let styleFilename: string | null = null;
+    if (styleBlob) {
+        styleFilename = await uploadImage(styleBlob);
+    }
 
     // 2. Prepare Workflow (Convert if needed)
     // This handles both API format and Graph format (with subgraphs)
@@ -155,9 +159,18 @@ export function useComfy(): UseComfyReturn {
 
     // 3. Heuristic Updates
     // Update LoadImage
-    const imageNode = Object.values(workflow).find((n: any) => n.class_type === "LoadImage");
-    if (imageNode) {
-      (imageNode as any).inputs.image = filename;
+    const imageNodes = Object.values(workflow).filter((n: any) => n.class_type === "LoadImage");
+    
+    // The first image node is always the sketch
+    if (imageNodes[0]) {
+      (imageNodes[0] as any).inputs.image = filename;
+    }
+    
+    // The second image node is the style reference
+    if (imageNodes[1] && styleFilename) {
+      (imageNodes[1] as any).inputs.image = styleFilename;
+    } else if (imageNodes[1] && !styleFilename) {
+       (imageNodes[1] as any).inputs.image = filename;
     }
 
     // Update Prompt (CLIPTextEncode)
