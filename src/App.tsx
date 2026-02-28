@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ControlBar } from '@/components/ControlBar';
 import { BrushLibrary } from '@/components/BrushLibrary';
+import { BrushStudio } from '@/components/BrushStudio';
 import { SettingsDialog } from '@/components/SettingsDialog';
 import { RenderModeOverlay } from '@/components/RenderModeOverlay';
 import { CanvasArea, type CanvasAreaHandles } from '@/components/CanvasArea';
@@ -10,6 +11,7 @@ import { useComfy } from '@/hooks/useComfy';
 import { useFal } from '@/hooks/useFal';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { defaultWorkflow } from './defaultWorkflow';
+import { DEFAULT_BRUSH_STUDIO_SETTINGS, type BrushStudioSettings } from './utils/brushStudioSettings';
 
 const PRESETS: Record<string, string> = {
   studio: "product design sketch material, industrial design material, clean lighting, realistic material, white soft illumination background",
@@ -32,17 +34,21 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toolbarPosition, setToolbarPosition] = useState<"top" | "bottom">("bottom");
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [brushStudioOpen, setBrushStudioOpen] = useState(false);
   const [activeBrush, setActiveBrush] = useState("pencil");
+  const [brushStudioSettings, setBrushStudioSettings] = useState<BrushStudioSettings>(DEFAULT_BRUSH_STUDIO_SETTINGS);
   const [activeCustomStyle, setActiveCustomStyle] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState(3);
   const [brushOpacity, setBrushOpacity] = useState(1.0);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   
-  const [isDynamicRendering, setIsDynamicRendering] = useState(true);
+  const [isDynamicRendering, setIsDynamicRendering] = useState(false);
+  const [aiProvider, setAiProvider] = useLocalStorage<"comfy" | "fal">("klein-ai-provider", "comfy");
 
   const canvasRef = useRef<CanvasAreaHandles>(null);
   const debounceTimer = useRef<NodeJS.Timeout | undefined>(undefined);
+  const isGeneratingRef = useRef(false);
 
   const comfy = useComfy();
   const fal = useFal();
@@ -77,18 +83,19 @@ function App() {
     canvasRef.current?.redo();
   }, []);
 
-  const activeProvider = comfy.status === 'CONNECTED' ? 'comfy' : 'fal';
+  const activeProvider = aiProvider;
   const statusDisplay = activeProvider === 'comfy' ? comfy.status : fal.status;
 
   const generate = useCallback(async () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
     
-    // Capture
-    const dataUrl = canvasRef.current.getDataURL();
-    const prompt = PRESETS[activePreset];
+    try {
+      // Capture
+      const dataUrl = canvasRef.current.getDataURL();
+      const prompt = PRESETS[activePreset];
 
-    if (activeProvider === 'comfy') {
-      try {
+      if (activeProvider === 'comfy') {
         const storedWorkflow = localStorage.getItem("comfy-workflow");
         const baseWorkflow = storedWorkflow ? JSON.parse(storedWorkflow) : defaultWorkflow; 
         
@@ -100,14 +107,16 @@ function App() {
              }
              await comfy.runWorkflow(baseWorkflow, blob, prompt, styleBlob);
         }
-      } catch (e) {
-        console.error("Comfy Gen Error", e);
+      } else {
+        // Logic for Fal
+        if (fal.send) {
+            fal.send(dataUrl, prompt);
+        }
       }
-    } else {
-      // Logic for Fal
-      if (fal.send) {
-          fal.send(dataUrl, prompt);
-      }
+    } catch (e) {
+      console.error("Gen Error:", e);
+    } finally {
+      isGeneratingRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePreset, activeProvider, comfy.runWorkflow, fal.send, activeCustomStyle]);
@@ -170,18 +179,30 @@ function App() {
         onOpenChange={setSettingsOpen}
         onConnect={comfy.connect}
         status={comfy.status}
+        provider={aiProvider}
+        onProviderChange={setAiProvider}
       />
 
-      <BrushLibrary // New component
+      <BrushLibrary
         isOpen={isLibraryOpen} 
         onClose={() => setIsLibraryOpen(false)}
         activeBrush={activeBrush}
-        onSelectBrush={(brush) => {
-          setActiveBrush(brush);
-          // Optional: Close library on select?
-          // setIsLibraryOpen(false);
-        }}
+        onSelectBrush={setActiveBrush}
+        onOpenStudio={() => setBrushStudioOpen(true)}
       />
+
+      {brushStudioOpen && (
+        <BrushStudio
+          isOpen={brushStudioOpen}
+          brushName={activeBrush}
+          settings={brushStudioSettings}
+          onDone={(settings: BrushStudioSettings) => {
+             setBrushStudioSettings(settings);
+             setBrushStudioOpen(false);
+          }}
+          onCancel={() => setBrushStudioOpen(false)}
+        />
+      )}
       
       <BrushControlWidget
         brushSize={brushSize}
@@ -230,13 +251,14 @@ function App() {
                     activeBrush={activeBrush}
                     opacity={brushOpacity}
                     onHistoryChange={handleHistoryChange}
+                    studioSettings={brushStudioSettings}
                 />
              </div>
         </div>
 
         {/* Output Area */}
         <div className={`${viewMode === 'split' ? 'relative w-1/2 h-full border-l border-white/10 p-8' : 'absolute w-full h-full top-0 left-0 z-0 bg-muted/20'} flex items-center justify-center`}>
-            <div className={`relative flex items-center justify-center overflow-hidden ${viewMode === 'merge' ? 'w-1/2 h-full' : 'w-full h-full rounded-md shadow-md border border-red-500 bg-background/50'}`}>
+            <div className={`relative flex items-center justify-center overflow-hidden ${viewMode === 'merge' ? 'w-1/2 h-full' : 'w-full h-full rounded-md shadow-md border border-gray-300 bg-background/50'}`}>
                {activeProvider === 'comfy' && comfy.lastImage && (
                    <img src={comfy.lastImage} className={`w-full h-full object-cover ${viewMode === 'merge' ? '' : 'rounded-md'}`} alt="ComfyUI Output" />
                )}

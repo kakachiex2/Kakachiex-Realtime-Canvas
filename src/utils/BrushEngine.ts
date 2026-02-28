@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - mybrush.js has no types
 import { MypaintBrush, MypaintSurface, BRUSH, ColorRGB } from '../vendor/brushlib/js/mybrush.js';
+import type { BrushStudioSettings } from './brushStudioSettings';
 
 // We need to map the brush names to their JSON content.
 // Since we are in Vite, we can use glob import to get all json files.
@@ -30,6 +31,17 @@ export class BrushEngine {
     // Store original preset base values to scale relative to them
     private defaultBaseRadius: number = 0;
     private defaultBaseOpacity: number = 1;
+    // Store original preset base values for studio settings so we can apply deltas
+    private presetDabsPerBasicRadius: number = 0;
+    private presetDabsPerActualRadius: number = 4;
+    private presetOffsetByRandom: number = 0;
+    private presetOffsetBySpeed: number = 0;
+    private presetHardness: number = 0.5;
+    private presetSlowTracking: number = 0;
+    private presetSlowTrackingPerDab: number = 0;
+    private presetSpeed1Slowness: number = 0.04;
+    private presetSpeed2Slowness: number = 0.8;
+    private presetDirectionFilter: number = 2;
 
     constructor(canvas: HTMLCanvasElement) {
         this.surface = new MypaintSurface(canvas);
@@ -74,11 +86,22 @@ export class BrushEngine {
     public setBrush(name: string) {
         const preset = BrushEngine.presets.find(p => p.name === name);
         if (preset) {
-            // Save original base values so we can apply relative scaling
-            this.defaultBaseRadius = preset.setting[BRUSH.RADIUS_LOGARITHMIC]?.base_value ?? 0;
-            this.defaultBaseOpacity = preset.setting[BRUSH.OPAQUE]?.base_value ?? 1;
-
             this.brush = new MypaintBrush(preset.setting, this.surface);
+            
+            // Save original base values from the brush instance's internal settings array.
+            // We read AFTER construction because readmyb_json maps string keys to numeric indices.
+            this.defaultBaseRadius = this.brush.settings[BRUSH.RADIUS_LOGARITHMIC].base_value;
+            this.defaultBaseOpacity = this.brush.settings[BRUSH.OPAQUE].base_value;
+            this.presetDabsPerBasicRadius = this.brush.settings[BRUSH.DABS_PER_BASIC_RADIUS].base_value;
+            this.presetDabsPerActualRadius = this.brush.settings[BRUSH.DABS_PER_ACTUAL_RADIUS].base_value;
+            this.presetOffsetByRandom = this.brush.settings[BRUSH.OFFSET_BY_RANDOM].base_value;
+            this.presetOffsetBySpeed = this.brush.settings[BRUSH.OFFSET_BY_SPEED].base_value;
+            this.presetHardness = this.brush.settings[BRUSH.HARDNESS].base_value;
+            this.presetSlowTracking = this.brush.settings[BRUSH.SLOW_TRACKING].base_value;
+            this.presetSlowTrackingPerDab = this.brush.settings[BRUSH.SLOW_TRACKING_PER_DAB].base_value;
+            this.presetSpeed1Slowness = this.brush.settings[BRUSH.SPEED1_SLOWNESS].base_value;
+            this.presetSpeed2Slowness = this.brush.settings[BRUSH.SPEED2_SLOWNESS].base_value;
+            this.presetDirectionFilter = this.brush.settings[BRUSH.DIRECTION_FILTER].base_value;
         }
     }
 
@@ -106,20 +129,125 @@ export class BrushEngine {
         this.brush.settings[BRUSH.OPAQUE].base_value = this.defaultBaseOpacity * opacity;
     }
 
+    /**
+     * Apply Brush Studio settings to the active MyPaint brush.
+     * Maps UI slider values (0-100%) to actual MyPaint BRUSH parameters.
+     */
+    public applyStudioSettings(s: BrushStudioSettings) {
+        if (!this.brush) return;
+
+        // ── STROKE PROPERTIES ──────────────────────────────────
+        
+        // Spacing: controls dab density. spacing=1% → dense (high dabs value ~6)
+        // spacing=100% → sparse (low dabs value ~0.3)
+        // We invert: higher spacing % = fewer dabs = sparser stroke
+        const spacingFactor = Math.max(0.1, 1.0 / (s.spacing / 100 * 3 + 0.1));
+        this.brush.settings[BRUSH.DABS_PER_BASIC_RADIUS].base_value = 
+            this.presetDabsPerBasicRadius * spacingFactor;
+        this.brush.settings[BRUSH.DABS_PER_ACTUAL_RADIUS].base_value = 
+            this.presetDabsPerActualRadius * spacingFactor;
+
+        // Spacing Jitter: adds randomness to radius → visual "spacing jitter"
+        // 0% = no random radius, 100% = lots of random radius variation
+        this.brush.settings[BRUSH.RADIUS_BY_RANDOM].base_value = (s.spacingJitter / 100) * 1.5;
+
+        // Jitter Lateral: random offset perpendicular to stroke direction
+        // Maps 0-100% → 0.0-3.0 on OFFSET_BY_RANDOM
+        this.brush.settings[BRUSH.OFFSET_BY_RANDOM].base_value = 
+            this.presetOffsetByRandom + (s.jitterLateral / 100) * 3.0;
+
+        // Jitter Linear: offset along stroke direction (speed-based offset)
+        // Maps 0-100% → 0.0-2.0 on OFFSET_BY_SPEED
+        this.brush.settings[BRUSH.OFFSET_BY_SPEED].base_value = 
+            this.presetOffsetBySpeed + (s.jitterLinear / 100) * 2.0;
+
+        // Fall off: controls hardness of the dab edge
+        // 0% = soft falloff (low hardness), 100% = crisp hard edge (hardness=1.0)
+        this.brush.settings[BRUSH.HARDNESS].base_value = 
+            this.presetHardness * (1 - s.fallOff / 100) + (s.fallOff / 100);
+
+        // ── STABILIZATION ──────────────────────────────────────
+        
+        // StreamLine Amount: smooth cursor tracking (lagging behind mouse)
+        // 0% = instant tracking, 100% = heavy smoothing 
+        // Maps 0-100% → 0.0-15.0 on SLOW_TRACKING
+        this.brush.settings[BRUSH.SLOW_TRACKING].base_value = 
+            this.presetSlowTracking + (s.streamlineAmount / 100) * 15.0;
+
+        // StreamLine Pressure: per-dab tracking smoothing
+        // Maps 0-100% → 0.0-8.0 on SLOW_TRACKING_PER_DAB
+        this.brush.settings[BRUSH.SLOW_TRACKING_PER_DAB].base_value = 
+            this.presetSlowTrackingPerDab + (s.streamlinePressure / 100) * 8.0;
+
+        // Stabilization Amount: speed smoothing (averages speed over time)
+        // Higher values = slower response to speed changes
+        // Maps 0-100% → base + 0.0-5.0 on SPEED1_SLOWNESS
+        this.brush.settings[BRUSH.SPEED1_SLOWNESS].base_value = 
+            this.presetSpeed1Slowness + (s.stabilizationAmount / 100) * 5.0;
+
+        // Motion filtering Amount: secondary speed averaging  
+        // Maps 0-100% → base + 0.0-6.0 on SPEED2_SLOWNESS
+        this.brush.settings[BRUSH.SPEED2_SLOWNESS].base_value = 
+            this.presetSpeed2Slowness + (s.motionFilterAmount / 100) * 6.0;
+
+        // Motion filtering Expression: direction smoothing
+        // Maps 0-100% → base + 0.0-10.0 on DIRECTION_FILTER
+        this.brush.settings[BRUSH.DIRECTION_FILTER].base_value = 
+            this.presetDirectionFilter + (s.motionFilterExpression / 100) * 10.0;
+
+        // ── TAPER ──────────────────────────────────────────────
+        // Taper settings modify how pressure affects size and opacity.
+        // We modify the pressure response curves (pointsList) on the brush's
+        // RADIUS_LOGARITHMIC and OPAQUE_MULTIPLY mappings.
+
+        // Taper Size: how much the stroke tapers at start/end based on pressure
+        // We modify the pressure→radius curve to control size taper
+        const radiusMapping = this.brush.settings[BRUSH.RADIUS_LOGARITHMIC];
+        const taperSizeFactor = s.taperSize / 100; // 0.0 = no taper, 1.0 = full taper
+        if (radiusMapping.pointsList) {
+            const pressurePts = radiusMapping.pointsList[0]; // INPUT.PRESSURE = 0
+            if (pressurePts && pressurePts.n >= 2) {
+                // Scale the pressure-to-radius curve: stronger taper = steeper ramp
+                const range = taperSizeFactor * 1.5;
+                pressurePts.yvalues[0] = -range;
+                pressurePts.yvalues[pressurePts.n - 1] = range * 0.5;
+            }
+        }
+
+        // Taper Opacity: how pressure affects opacity at stroke edges
+        const opacityMapping = this.brush.settings[BRUSH.OPAQUE_MULTIPLY];
+        const taperOpacityFactor = s.taperOpacity / 100;
+        if (opacityMapping.pointsList) {
+            const pressurePts = opacityMapping.pointsList[0]; // INPUT.PRESSURE = 0
+            if (pressurePts && pressurePts.n >= 2) {
+                // Scale the pressure-to-opacity curve
+                pressurePts.yvalues[0] = -taperOpacityFactor;
+                pressurePts.yvalues[pressurePts.n - 1] = taperOpacityFactor;
+            }
+        }
+
+        // Taper Pressure: overall pressure sensitivity multiplier
+        // Affects STROKE_THRESHOLD — at what pressure the stroke registers
+        const pressureThreshold = (1 - s.taperPressure / 100) * 0.1;
+        this.brush.settings[BRUSH.STROKE_THRESHOLD].base_value = pressureThreshold;
+
+        // Taper Tip: controls elliptical dab ratio for tip shape
+        // 0 = sharp (ratio ~1), 100 = square (ratio ~3)
+        const tipRatio = 1.0 + (s.taperTip / 100) * 2.0;
+        this.brush.settings[BRUSH.ELLIPTICAL_DAB_RATIO].base_value = tipRatio;
+
+        // Call settings_base_values_have_changed to recalculate internal speed mappings
+        this.brush.settings_base_values_have_changed();
+    }
+
     public startStroke(x: number, y: number) {
         if (!this.brush) return;
         this.brush.new_stroke(x, y);
     }
 
-    public strokeTo(x: number, y: number, pressure: number = 0.5, dtime: number = 0.1) {
+    public strokeTo(x: number, y: number, pressure: number = 0.5, dt: number = 0.1) {
         if (!this.brush) return;
         // 90 xtilt was necessary to activate certain flat shaders nicely
-        this.brush.stroke_to(x, y, pressure, 90, 0, dtime);
-    }
-
-    public endStroke() {
-        // MypaintBrush doesn't strictly need an end method, but we can reset if needed
-        // this.brush.stroke_to(x, y, 0, ...)? 
-        // usually we just stop calling stroke_to
+        this.brush.stroke_to(x, y, pressure, 90, 0, dt);
     }
 }

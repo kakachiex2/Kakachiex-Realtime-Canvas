@@ -1,5 +1,6 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { BrushEngine } from '../utils/BrushEngine';
+import type { BrushStudioSettings } from '../utils/brushStudioSettings';
 
 export interface CanvasAreaHandles {
   clear: () => void;
@@ -15,9 +16,10 @@ interface CanvasAreaProps {
   activeBrush?: string;
   opacity?: number;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  studioSettings?: BrushStudioSettings;
 }
 
-export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDraw, color, brushSize, activeBrush, opacity, onHistoryChange }, ref) => {
+export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDraw, color, brushSize, activeBrush, opacity, onHistoryChange, studioSettings }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const brushEngineRef = useRef<BrushEngine | null>(null);
@@ -138,6 +140,12 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
   }, [opacity]);
 
   useEffect(() => {
+    if (brushEngineRef.current && studioSettings) {
+        brushEngineRef.current.applyStudioSettings(studioSettings);
+    }
+  }, [studioSettings]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -174,7 +182,7 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     return () => observer.disconnect();
   }, []);
 
-  const getPos = (e: React.PointerEvent) => {
+  const getPos = (e: React.PointerEvent | PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -199,21 +207,30 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     if (pressure === 0 && e.pointerType === 'mouse') pressure = 0.5;
 
     brushEngineRef.current?.startStroke(pos.x, pos.y);
-    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, 0.1); 
+    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, 0.001); 
   };
 
   const draw = (e: React.PointerEvent) => {
     if (!isDrawing.current) return;
     
-    const pos = getPos(e);
-    let pressure = e.pressure;
-    if (pressure === 0 && e.pointerType === 'mouse') pressure = 0.5;
+    const nativeEvent = e.nativeEvent as PointerEvent;
+    const eventsToProcess = nativeEvent.getCoalescedEvents ? nativeEvent.getCoalescedEvents() : [nativeEvent];
+    if (eventsToProcess.length === 0) {
+      eventsToProcess.push(nativeEvent);
+    }
 
     const now = performance.now() / 1000;
-    let dt = now - lastTime.current;
-    if (dt <= 0) dt = 0.001;
+    let totalDt = now - lastTime.current;
+    if (totalDt <= 0) totalDt = 0.001;
+    const dtPerEvent = totalDt / eventsToProcess.length;
 
-    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, dt);
+    for (const ev of eventsToProcess) {
+      const pos = getPos(ev);
+      let pressure = ev.pressure;
+      if (pressure === 0 && ev.pointerType === 'mouse') pressure = 0.5;
+
+      brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, dtPerEvent);
+    }
     
     lastTime.current = now;
   };

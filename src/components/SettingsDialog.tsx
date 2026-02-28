@@ -18,11 +18,13 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void
   onConnect: (host: string) => void
   status: string
+  provider: "comfy" | "fal"
+  onProviderChange: (provider: "comfy" | "fal") => void
 }
 
-export function SettingsDialog({ open, onOpenChange, onConnect, status }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, onConnect, status, provider, onProviderChange }: SettingsDialogProps) {
   // Persistent Storage
-  const [storedHost, setStoredHost] = useLocalStorage("comfy-host", "http://127.0.0.1:8188")
+  const [storedHost, setStoredHost] = useLocalStorage("comfy-host", "http://127.0.0.1:8000")
   const [storedWorkflow, setStoredWorkflow] = useLocalStorage("comfy-workflow", "{}")
   const [storedWorkflowName, setStoredWorkflowName] = useLocalStorage("comfy-workflow-name", "")
 
@@ -31,6 +33,7 @@ export function SettingsDialog({ open, onOpenChange, onConnect, status }: Settin
   const [workflow, setWorkflow] = useState(storedWorkflow)
   const [workflows, setWorkflows] = useState<string[]>([])
   const [selectedFile, setSelectedFile] = useState<string>(storedWorkflowName)
+  const [localProvider, setLocalProvider] = useState<"comfy" | "fal">(provider)
 
   // Sync from storage when dialog opens
   useEffect(() => {
@@ -38,6 +41,7 @@ export function SettingsDialog({ open, onOpenChange, onConnect, status }: Settin
       setHost(storedHost)
       setWorkflow(storedWorkflow)
       setSelectedFile(storedWorkflowName)
+      setLocalProvider(provider)
       
       // Fetch workflows
       fetch('/api/workflows')
@@ -56,6 +60,7 @@ export function SettingsDialog({ open, onOpenChange, onConnect, status }: Settin
     setStoredHost(host)
     setStoredWorkflow(workflow)
     if (selectedFile) setStoredWorkflowName(selectedFile)
+    onProviderChange(localProvider)
     onConnect(host)
     // Do NOT close dialog
   }
@@ -64,6 +69,7 @@ export function SettingsDialog({ open, onOpenChange, onConnect, status }: Settin
     setStoredHost(host)
     setStoredWorkflow(workflow)
     if (selectedFile) setStoredWorkflowName(selectedFile)
+    onProviderChange(localProvider)
     onOpenChange(false)
   }
   
@@ -100,7 +106,22 @@ export function SettingsDialog({ open, onOpenChange, onConnect, status }: Settin
           {/* Status Indicator */}
           <div className="flex items-center justify-center gap-2 pb-2">
              <Circle className={`h-3 w-3 ${getStatusColor()}`} />
-             <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{status}</span>
+             <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{localProvider === 'comfy' ? status : 'Fal API'}</span>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">AI Provider</Label>
+            <div className="col-span-3">
+                <Select value={localProvider} onValueChange={(v) => setLocalProvider(v as "comfy" | "fal")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="comfy">ComfyUI (Local)</SelectItem>
+                    <SelectItem value="fal">Fal AI (Cloud)</SelectItem>
+                  </SelectContent>
+                </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
@@ -112,7 +133,7 @@ export function SettingsDialog({ open, onOpenChange, onConnect, status }: Settin
               value={host}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHost(e.target.value)}
               className="col-span-3"
-              placeholder="http://127.0.0.1:8188"
+              placeholder="http://127.0.0.1:8000"
             />
           </div>
           

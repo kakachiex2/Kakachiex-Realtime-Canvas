@@ -70,7 +70,7 @@ export function CustomStyleWidget({ onSelectStyle, activeStyleUrl }: CustomStyle
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="absolute bottom-24 right-6 z-40 w-12 h-12 rounded-full bg-background/80 backdrop-blur-md border shadow-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:scale-105 transition-all outline-none"
+        className="fixed bottom-5 left-1/2 ml-[14rem] z-40 w-12 h-12 rounded-full bg-background/80 backdrop-blur-md border shadow-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:scale-105 transition-all outline-none"
         title="Custom Style Reference"
       >
         {activeStyleUrl ? (
@@ -88,7 +88,7 @@ export function CustomStyleWidget({ onSelectStyle, activeStyleUrl }: CustomStyle
   }
 
   return (
-    <div className="absolute bottom-24 right-6 z-40 w-80 bg-background/80 backdrop-blur-md rounded-2xl border shadow-xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 zoom-in-95 duration-200">
+    <div className="fixed bottom-5 left-1/2 ml-[14rem] origin-bottom-left z-40 w-80 bg-background/80 backdrop-blur-md rounded-2xl border shadow-xl flex flex-col overflow-hidden animate-in slide-in-from-left-5 zoom-in-95 duration-200">
       
       {/* Header */}
       <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/20">

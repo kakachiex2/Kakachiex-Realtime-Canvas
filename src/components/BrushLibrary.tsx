@@ -69,9 +69,10 @@ interface BrushLibraryProps {
   onClose: () => void;
   onSelectBrush: (brushName: string) => void;
   activeBrush: string;
+  onOpenStudio?: (brushName: string) => void;
 }
 
-export function BrushLibrary({ isOpen, onClose, onSelectBrush, activeBrush }: BrushLibraryProps) {
+export function BrushLibrary({ isOpen, onClose, onSelectBrush, activeBrush, onOpenStudio }: BrushLibraryProps) {
   const [presets] = useState<BrushPreset[]>(() => {
     if (BrushEngine.presets.length === 0) {
       BrushEngine.loadPresets();
@@ -86,9 +87,10 @@ export function BrushLibrary({ isOpen, onClose, onSelectBrush, activeBrush }: Br
   const currentBrushes = presets.filter(p => p.category === activeCategory);
 
   return (
-    <div className="fixed top-20 right-4 z-50 w-[320px] h-[500px] bg-popover border border-border rounded-xl shadow-2xl flex flex-col text-popover-foreground font-sans overflow-hidden animate-in fade-in slide-in-from-right-10 duration-200">
-      
-      {/* Header */}
+    <div className="fixed bottom-[98px] left-1/2 -translate-x-1/2 z-50">
+      <div className="w-[320px] h-[400px] max-h-[60vh] bg-popover border border-border rounded-xl shadow-2xl flex flex-col text-popover-foreground font-sans overflow-hidden animate-in fade-in slide-in-from-bottom-5 zoom-in-95 origin-bottom duration-200">
+        
+        {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border bg-muted/50">
         <span className="font-semibold text-sm">Brush Library</span>
         <div className="flex gap-1">
@@ -118,7 +120,13 @@ export function BrushLibrary({ isOpen, onClose, onSelectBrush, activeBrush }: Br
                 {currentBrushes.map(brush => (
                     <div 
                         key={brush.name}
-                        onClick={() => onSelectBrush(brush.name)}
+                        onClick={() => {
+                          if (activeBrush === brush.name && onOpenStudio) {
+                            onOpenStudio(brush.name);
+                          } else {
+                            onSelectBrush(brush.name);
+                          }
+                        }}
                         className={`group flex flex-col p-2 rounded-lg cursor-pointer transition-all ${activeBrush === brush.name ? "bg-accent text-accent-foreground border border-blue-500/50" : "hover:bg-muted border border-transparent"}`}
                     >
                         <div className="flex justify-between items-center mb-1">
@@ -132,6 +140,7 @@ export function BrushLibrary({ isOpen, onClose, onSelectBrush, activeBrush }: Br
                 ))}
             </div>
         </div>
+      </div>
       </div>
     </div>
   );
