@@ -38,22 +38,44 @@ function BrushPreview({ brushName }: { brushName: string }) {
     engine.startStroke(startX, midY);
     
     const steps = 40;
-    for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        
-        const p0 = { x: startX, y: midY };
-        const p1 = { x: w * 0.3, y: h * -0.5 };
-        const p2 = { x: w * 0.7, y: h * 1.5 };
-        const p3 = { x: endX, y: midY };
+    let currentStep = 0;
+    let animationFrameId: number;
+    let isCancelled = false;
 
-        const xt = Math.pow(1-t, 3)*p0.x + 3*Math.pow(1-t, 2)*t*p1.x + 3*(1-t)*t*t*p2.x + Math.pow(t, 3)*p3.x;
-        const yt = Math.pow(1-t, 3)*p0.y + 3*Math.pow(1-t, 2)*t*p1.y + 3*(1-t)*t*t*p2.y + Math.pow(t, 3)*p3.y;
+    const drawStep = () => {
+      if (isCancelled) return;
+      
+      // Draw a batch of steps per frame to balance speed and responsiveness
+      const BATCH_SIZE = 5;
+      
+      for (let b = 0; b < BATCH_SIZE && currentStep <= steps; b++, currentStep++) {
+          const t = currentStep / steps;
+          
+          const p0 = { x: startX, y: midY };
+          const p1 = { x: w * 0.3, y: h * -0.5 };
+          const p2 = { x: w * 0.7, y: h * 1.5 };
+          const p3 = { x: endX, y: midY };
 
-        const pressure = Math.sin(t * Math.PI) * 0.8 + 0.2; 
+          const xt = Math.pow(1-t, 3)*p0.x + 3*Math.pow(1-t, 2)*t*p1.x + 3*(1-t)*t*t*p2.x + Math.pow(t, 3)*p3.x;
+          const yt = Math.pow(1-t, 3)*p0.y + 3*Math.pow(1-t, 2)*t*p1.y + 3*(1-t)*t*t*p2.y + Math.pow(t, 3)*p3.y;
 
-        engine.strokeTo(xt, yt, pressure, 0.05);
-    }
+          const pressure = Math.sin(t * Math.PI) * 0.8 + 0.2; 
+          engine.strokeTo(xt, yt, pressure, 0.05);
+      }
 
+      if (currentStep <= steps) {
+         animationFrameId = requestAnimationFrame(drawStep);
+      } else {
+         engine.endStroke();
+      }
+    };
+    
+    drawStep();
+    
+    return () => {
+       isCancelled = true;
+       cancelAnimationFrame(animationFrameId);
+    };
   }, [brushName]);
 
   return (

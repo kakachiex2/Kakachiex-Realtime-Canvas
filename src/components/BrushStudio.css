@@ -480,3 +480,44 @@
   color: var(--bs-text-muted-hover);
 }
 
+/* ── Rendering Section Elements ───────────────────────── */
+.bs-rendering-btn {
+  padding: 10px 14px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 13px;
+  background: var(--bs-toggle-bg);
+  color: var(--bs-text-muted);
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bs-rendering-btn:hover {
+  background: var(--bs-item-hover);
+  color: var(--bs-text-muted-hover);
+}
+
+.bs-rendering-btn.active {
+  background: #1a73e8;
+  color: #ffffff;
+}
+
+.bs-rendering-select {
+  background: transparent;
+  color: #4a9eff;
+  border: none;
+  outline: none;
+  text-align: right;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.bs-rendering-option {
+  background: var(--bs-bg-main);
+  color: var(--bs-text-main);
+}

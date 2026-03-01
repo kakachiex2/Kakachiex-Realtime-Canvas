@@ -36,7 +36,7 @@ const SIDEBAR_SECTIONS: SidebarEntry[] = [
   { id: "taper",         label: "Taper",           icon: "〜",  enabled: true },
   { id: "shape",         label: "Shape",           icon: "✦",  enabled: false },
   { id: "grain",         label: "Grain",           icon: "▦",  enabled: false },
-  { id: "rendering",     label: "Rendering",       icon: "⟋",  enabled: false },
+  { id: "rendering",     label: "Rendering",       icon: "⟋",  enabled: true },
   { id: "wetmix",        label: "Wet Mix",         icon: "💧",  enabled: false },
   { id: "colordynamics", label: "Color dynamics",  icon: "✧",  enabled: false },
   { id: "dynamics",      label: "Dynamics",        icon: "⌇",  enabled: false },
@@ -116,7 +116,33 @@ function ToggleRow({
   );
 }
 
-// ── Taper Curve Preview ────────────────────────────────────
+// ── Utility: Select Row ────────────────────────────────────
+function SelectRow({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="bs-select-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '12px 0px 4px 0px' }}>
+      <span className="bs-slider-label">{label}</span>
+      <select 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)}
+        className="bs-rendering-select"
+      >
+        {options.map(opt => <option key={opt} value={opt} className="bs-rendering-option">{opt}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ── Utility: List Selection ────────────────────────────────
 function TaperCurvePreview({ size, pressure }: { size: number; pressure: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -356,6 +382,7 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
   const handlePadUp = useCallback(
     (e: React.PointerEvent) => {
       if (isDrawingRef.current) {
+        padEngineRef.current?.endStroke();
         padCanvasRef.current?.releasePointerCapture(e.pointerId);
         isDrawingRef.current = false;
       }
@@ -364,10 +391,7 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
   );
 
   const clearPad = useCallback(() => {
-    const canvas = padCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    padEngineRef.current?.clear();
   }, []);
 
   // Settings updater helpers
@@ -424,6 +448,48 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
     </>
   );
 
+  const renderRendering = () => (
+    <>
+      <div className="bs-section-title">Rendering mode</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+         {["Light Glaze", "Uniformed Glaze", "Intense Glaze", "Heavy Glaze", "Uniform Blending", "Intense Blending"].map(mode => (
+             <button
+                key={mode}
+                onClick={() => updateSetting("renderingMode", mode)}
+                className={`bs-rendering-btn ${localSettings.renderingMode === mode ? 'active' : ''}`}
+             >
+                {mode}
+                {localSettings.renderingMode === mode && <span>✓</span>}
+             </button>
+         ))}
+      </div>
+
+      <div className="bs-group-title">Blending</div>
+      <SliderRow label="Flow" value={localSettings.flow} onChange={(v) => updateSetting("flow", v)} />
+      <SliderRow label="Wet edges" value={localSettings.wetEdges} onChange={(v) => updateSetting("wetEdges", v)} />
+      <SliderRow label="Burnt edges" value={localSettings.burnEdges} onChange={(v) => updateSetting("burnEdges", v)} />
+      
+      <SelectRow 
+          label="Burnt edges mode" 
+          value={localSettings.burnEdgesMode} 
+          options={["Multiply", "Linear Burn", "Color Burn", "Overlay"]} 
+          onChange={(v) => updateSetting("burnEdgesMode", v)} 
+      />
+      <SelectRow 
+          label="Blend mode" 
+          value={localSettings.blendMode} 
+          options={["Normal", "Multiply", "Screen", "Overlay", "Darken", "Lighten", "Color Dodge", "Color Burn"]} 
+          onChange={(v) => updateSetting("blendMode", v)} 
+      />
+
+      <div style={{ marginTop: '16px' }}>
+          <ToggleRow label="Luminance blending" value={localSettings.luminanceBlending} onChange={(v) => updateSetting("luminanceBlending", v)} />
+          <ToggleRow label="Alpha Threshold" value={localSettings.alphaThreshold} onChange={(v) => updateSetting("alphaThreshold", v)} />
+          <SliderRow label="Threshold Amount" value={localSettings.thresholdAmount} onChange={(v) => updateSetting("thresholdAmount", v)} />
+      </div>
+    </>
+  );
+
   const renderSection = () => {
     switch (activeSection) {
       case "stroke":
@@ -432,6 +498,8 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
         return renderStabilization();
       case "taper":
         return renderTaper();
+      case "rendering":
+        return renderRendering();
       default:
         return <div className="bs-coming-soon">Coming soon</div>;
     }

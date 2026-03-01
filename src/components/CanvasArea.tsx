@@ -40,16 +40,27 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
     
+    // If we've undone some steps and then draw again, slice off the "future" (redo) states
     if (historyStepRef.current < historyRef.current.length - 1) {
        historyRef.current = historyRef.current.slice(0, historyStepRef.current + 1);
     }
     
-    historyRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    // Create a strict copy of the pixels so future strokes can't mutate the undo history
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const isolatedData = new ImageData(
+      new Uint8ClampedArray(imgData.data),
+      imgData.width,
+      imgData.height
+    );
+    
+    historyRef.current.push(isolatedData);
+    
     if (historyRef.current.length > 30) {
          historyRef.current.shift();
-    } else {
-         historyStepRef.current++;
     }
+    
+    // Always strictly align current step to the tip of history
+    historyStepRef.current = historyRef.current.length - 1;
     notifyHistory();
   };
 
@@ -68,9 +79,7 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     clear: () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      brushEngineRef.current?.clear();
       saveState();
     },
     getDataURL: () => {
@@ -171,6 +180,11 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     };
     
     resize();
+    // Guarantee an initial state is saved even if resize doesn't trigger it immediately
+    if (historyRef.current.length === 0) {
+       saveState();
+    }
+    
     const parent = canvas.parentElement;
     if (!parent) return;
 
@@ -197,6 +211,7 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     isDrawing.current = true;
     lastTime.current = performance.now() / 1000;
     
+    // Safety check just in case resize/mount missed it
     if (historyRef.current.length === 0) {
         saveState();
     }
@@ -237,10 +252,18 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
 
   const endDraw = (e: React.PointerEvent) => {
     if (isDrawing.current) {
-        canvasRef.current?.releasePointerCapture(e.pointerId);
+      try {
+        brushEngineRef.current?.endStroke();
+        if (e.pointerId && canvasRef.current?.hasPointerCapture(e.pointerId)) {
+          canvasRef.current.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) {
+        console.warn("Error releasing pointer capture:", err);
+      } finally {
         isDrawing.current = false;
         saveState();
-        onDraw(); 
+        onDraw();
+      }
     }
   };
 

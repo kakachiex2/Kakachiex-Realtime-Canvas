@@ -14,12 +14,23 @@ export interface BrushStudioSettings {
   motionFilterAmount: number;
   motionFilterExpression: number;
   // Taper
+  // Taper
   taperSize: number;
   taperOpacity: number;
   taperPressure: number;
   taperTip: number;
   taperLinkTips: boolean;
   taperTipAnimation: boolean;
+  // Rendering
+  renderingMode: string;
+  blendMode: string;
+  flow: number;
+  wetEdges: number;
+  burnEdges: number;
+  burnEdgesMode: string;
+  luminanceBlending: boolean;
+  alphaThreshold: boolean;
+  thresholdAmount: number;
 }
 
 export const DEFAULT_BRUSH_STUDIO_SETTINGS: BrushStudioSettings = {
@@ -39,4 +50,13 @@ export const DEFAULT_BRUSH_STUDIO_SETTINGS: BrushStudioSettings = {
   taperTip: 5,
   taperLinkTips: false,
   taperTipAnimation: true,
+  renderingMode: "Intense Blending",
+  blendMode: "Normal",
+  flow: 45,
+  wetEdges: 0,
+  burnEdges: 0,
+  burnEdgesMode: "Multiply",
+  luminanceBlending: false,
+  alphaThreshold: false,
+  thresholdAmount: 0,
 };

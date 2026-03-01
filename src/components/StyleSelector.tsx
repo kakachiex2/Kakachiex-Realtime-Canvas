@@ -62,7 +62,7 @@ export function StyleSelector({ activePreset, onSelect, presets, side = "bottom"
         <div
           className={`fixed left-1/2 -translate-x-1/2 ${
             side === "top" ? "bottom-20" : "top-20"
-          } z-50 p-2 bg-background/95 backdrop-blur-md border rounded-xl shadow-xl flex gap-2 overflow-x-auto max-w-[80vw] min-w-[300px] scrollbar-hide`}
+          } z-50 p-2 bg-background/95 backdrop-blur-md border rounded-xl shadow-xl flex gap-2 overflow-x-auto max-w-[80vw] min-w-[300px] scrollbar-hide animate-in fade-in slide-in-from-bottom-5 zoom-in-95 origin-bottom duration-200`}
         >
           {Object.keys(presets).map((key) => (
             <div
