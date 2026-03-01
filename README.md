@@ -27,7 +27,7 @@ Whether you are sketching an industrial product, a glossy ceramic toy, or a neon
 <br />
 <div align="center">
   <!-- Placeholder for a beautiful screenshot of the app -->
-  <img src="./src/assets/Screenshot_20-2-2026_172945_localhost.jpeg" alt="App Screenshot Placeholder" width="100%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+  <img src="./src/assets/Flux2Klein-Sketch2Render_02.png " alt="App Screenshot Placeholder" width="100%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
   <p><em>Kakachiex Realtime Canvas.</em></p>
 </div>
 <br />
