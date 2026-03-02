@@ -59,12 +59,11 @@ export function StyleSelector({ activePreset, onSelect, presets, side = "bottom"
       </Button>
 
       {isOpen && (
-        <div
-          className={`fixed left-1/2 -translate-x-1/2 ${
-            side === "top" ? "bottom-20" : "top-20"
-          } z-50 p-2 bg-background/95 backdrop-blur-md border rounded-xl shadow-xl flex gap-2 overflow-x-auto max-w-[80vw] min-w-[300px] scrollbar-hide animate-in fade-in slide-in-from-bottom-5 zoom-in-95 origin-bottom duration-200`}
-        >
-          {Object.keys(presets).map((key) => (
+        <div className={`fixed inset-x-0 ${side === "top" ? "bottom-20" : "top-20"} z-50 flex justify-center pointer-events-none`}>
+          <div
+            className="pointer-events-auto p-2 bg-background/95 backdrop-blur-md border rounded-xl shadow-xl flex gap-2 overflow-hidden max-w-[80vw] min-w-[800px] scrollbar-hide animate-in fade-in slide-in-from-top-4 zoom-in-95 origin-top duration-200"
+          >
+            {Object.keys(presets).map((key) => (
             <div
               key={key}
               className={`relative group cursor-pointer flex-shrink-0 transition-all ${
@@ -86,8 +85,9 @@ export function StyleSelector({ activePreset, onSelect, presets, side = "bottom"
                 <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] text-center py-0.5 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 rounded-b-lg">
                     {key}
                 </div>
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -342,6 +342,42 @@ export class BrushEngine {
     // Store settings so compositor can use them during stroke
     this.activeSettings = s;
 
+    // ── PENCIL & STYLUS ────────────────────────────────────────
+    // Map the new stylus configuration constraints directly from the Brush Studio
+    // to the underlying MyPaint engine settings.
+
+    // Pressure constraints
+    if (s.pressureSize !== 15) {
+      // Offset radius base value if a strict size override is dictated by pressure
+      this.brush.settings[BRUSH.RADIUS_LOGARITHMIC].base_value +=
+        (s.pressureSize - 15) * 0.01;
+    }
+
+    if (s.pressureOpacity > 0) {
+      // Decrease base opacity barrier based on the pressure opacity slider
+      this.brush.settings[BRUSH.OPAQUE_MULTIPLY].base_value *=
+        1 - s.pressureOpacity / 100;
+    }
+
+    if (s.pressureFlow < 100) {
+      // Restrict maximum pigment flow dynamically based on the set percentage.
+      const pressureFlowFactor = s.pressureFlow / 100;
+      this.brush.settings[BRUSH.OPAQUE].base_value =
+        this.defaultBaseOpacity * flowFactor * pressureFlowFactor;
+    }
+
+    // Tilt constraints
+    if (s.tiltSize > 0) {
+      // Force the brush size to widen as the pencil dictates flat shading.
+      // In a full implementation, this modifies the INPUT.TILT curves directly,
+      // here we adjust the base log scale as a proxy.
+      this.brush.settings[BRUSH.RADIUS_LOGARITHMIC].base_value +=
+        (s.tiltSize / 100) * 0.5;
+    }
+
+    // Hover, Barrel Roll, and Outline properties are typically managed by the UI overlay
+    // or specific PointerEvent listener layers rather than the internal brush physics.
+
     // Call settings_base_values_have_changed to recalculate internal speed mappings
     this.brush.settings_base_values_have_changed();
   }
@@ -407,16 +443,49 @@ export class BrushEngine {
     this.baseImageData = null;
   }
 
+  private evaluatePressureCurve(
+    curve: { x: number; y: number }[],
+    p: number,
+  ): number {
+    if (!curve || curve.length === 0) return p;
+    if (p <= curve[0].x) return curve[0].y;
+    if (p >= curve[curve.length - 1].x) return curve[curve.length - 1].y;
+    for (let i = 0; i < curve.length - 1; i++) {
+      const p1 = curve[i];
+      const p2 = curve[i + 1];
+      if (p >= p1.x && p <= p2.x) {
+        const t = (p - p1.x) / (p2.x - p1.x);
+        return p1.y + t * (p2.y - p1.y);
+      }
+    }
+    return p;
+  }
+
   public strokeTo(
     x: number,
     y: number,
     pressure: number = 0.5,
+    tiltX: number = 0,
+    tiltY: number = 0,
     dt: number = 0.1,
   ) {
     if (!this.brush) return;
 
-    // 90 xtilt was necessary to activate certain flat shaders nicely
-    this.brush.stroke_to(x, y, pressure, 90, 0, dt);
+    let finalPressure = pressure;
+    if (this.activeSettings?.pressureCurve) {
+      finalPressure = this.evaluatePressureCurve(
+        this.activeSettings.pressureCurve,
+        pressure,
+      );
+    }
+
+    // If hardware tilt is exactly 0 and 0 (e.g., mouse), fallback to 90
+    // so that flat markers don't completely disappear.
+    // Twist is captured but MyPaint core may not natively use it without custom mappings.
+    const xtilt = tiltX === 0 && tiltY === 0 ? 90 : tiltX;
+    const ytilt = tiltY;
+
+    this.brush.stroke_to(x, y, finalPressure, xtilt, ytilt, dt);
 
     // Composite the dynamically expanding stroke layer physically over the base image
     if (this.baseImageData) {

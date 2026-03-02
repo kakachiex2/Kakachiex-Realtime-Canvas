@@ -31,6 +31,29 @@ export interface BrushStudioSettings {
   luminanceBlending: boolean;
   alphaThreshold: boolean;
   thresholdAmount: number;
+
+  // Pencil / Stylus
+  pressureSize: number;
+  pressureOpacity: number;
+  pressureFlow: number;
+  pressureBleed: number;
+  pressureCurve: { x: number; y: number }[];
+
+  tiltAngle: number;
+  tiltOpacity: number;
+  tiltGradation: number;
+  tiltBleed: number;
+  tiltSize: number;
+  tiltSizeCompression: boolean;
+
+  barrelRollSize: number;
+  barrelRollOpacity: number;
+  barrelRollBleed: number;
+
+  cursorOutline: string; // "None", "Contrast", "Active color"
+  hoverEstimatedPressure: number;
+  hoverFill: string; // "None", "Shape"
+  hoverFillAll: boolean;
 }
 
 export const DEFAULT_BRUSH_STUDIO_SETTINGS: BrushStudioSettings = {
@@ -59,4 +82,29 @@ export const DEFAULT_BRUSH_STUDIO_SETTINGS: BrushStudioSettings = {
   luminanceBlending: false,
   alphaThreshold: false,
   thresholdAmount: 0,
+
+  pressureSize: 15,
+  pressureOpacity: 0,
+  pressureFlow: 100, // "Max" in UI
+  pressureBleed: 1,
+  pressureCurve: [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+  ],
+
+  tiltAngle: 0,
+  tiltOpacity: 0,
+  tiltGradation: 0,
+  tiltBleed: 0,
+  tiltSize: 0,
+  tiltSizeCompression: true,
+
+  barrelRollSize: 0,
+  barrelRollOpacity: 0,
+  barrelRollBleed: 0,
+
+  cursorOutline: "Contrast",
+  hoverEstimatedPressure: 10,
+  hoverFill: "Shape",
+  hoverFillAll: true,
 };

@@ -221,8 +221,11 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     if (e.pointerType === 'mouse' && e.buttons !== 1) return;
     if (pressure === 0 && e.pointerType === 'mouse') pressure = 0.5;
 
+    const tiltX = e.tiltX || 0;
+    const tiltY = e.tiltY || 0;
+
     brushEngineRef.current?.startStroke(pos.x, pos.y);
-    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, 0.001); 
+    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, 0.001); 
   };
 
   const draw = (e: React.PointerEvent) => {
@@ -244,7 +247,10 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
       let pressure = ev.pressure;
       if (pressure === 0 && ev.pointerType === 'mouse') pressure = 0.5;
 
-      brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, dtPerEvent);
+      const tiltX = ev.tiltX || 0;
+      const tiltY = ev.tiltY || 0;
+
+      brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, dtPerEvent);
     }
     
     lastTime.current = now;
