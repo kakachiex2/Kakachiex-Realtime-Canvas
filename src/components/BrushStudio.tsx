@@ -83,7 +83,7 @@ function SliderRow({
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           style={{
-            background: `linear-gradient(to right, #4a9eff ${pct}%, var(--bs-slider-track) ${pct}%)`,
+            background: `linear-gradient(to right, #4df0ff ${pct}%, transparent ${pct}%)`,
           }}
         />
       </div>
@@ -143,113 +143,109 @@ function SelectRow({
 }
 
 // ── Utility: List Selection ────────────────────────────────
-function TaperCurvePreview({ size, pressure }: { size: number; pressure: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function TaperWidget({ start, end, onChangeStart, onChangeEnd }: { start: number; end: number; onChangeStart: (v: number) => void; onChangeEnd: (v: number) => void; }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dragTarget, setDragTarget] = useState<'start' | 'end' | null>(null);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const parent = canvas.parentElement;
-    if (!parent) return;
-    canvas.width = parent.clientWidth;
-    canvas.height = parent.clientHeight;
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    
+    // Nearest dot
+    const distStart = Math.abs(x - start);
+    const distEnd = Math.abs(x - (1 - end));
+    
+    if (distStart < distEnd && distStart < 0.2) setDragTarget('start');
+    else if (distEnd < 0.2) setDragTarget('end');
+    
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const w = canvas.width;
-    const h = canvas.height;
-
-    ctx.clearRect(0, 0, w, h);
-
-    const isDark = document.documentElement.classList.contains("dark");
-    // Draw center line
-    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, h / 2);
-    ctx.lineTo(w, h / 2);
-    ctx.stroke();
-
-    // Draw vertical guides
-    const guideX1 = w * (size / 100);
-    const guideX2 = w * (1 - pressure / 100);
-    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)";
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(guideX1, 0);
-    ctx.lineTo(guideX1, h);
-    ctx.moveTo(guideX2, 0);
-    ctx.lineTo(guideX2, h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw taper shape (filled)
-    const midY = h / 2;
-    const maxThickness = h * 0.35;
-
-    ctx.fillStyle = isDark ? "rgba(180, 180, 180, 0.5)" : "rgba(100, 100, 100, 0.4)";
-    ctx.beginPath();
-    ctx.moveTo(0, midY);
-
-    // Top edge
-    const steps = 80;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = t * w;
-      let thickness = maxThickness;
-
-      // Start taper
-      const startTaper = size / 100;
-      if (t < startTaper) {
-        thickness *= t / startTaper;
-      }
-
-      // End taper
-      const endTaper = 1 - pressure / 100;
-      if (t > endTaper && endTaper < 1) {
-        thickness *= (1 - t) / (1 - endTaper);
-      }
-
-      ctx.lineTo(x, midY - thickness);
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragTarget || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    
+    if (dragTarget === 'start') {
+      onChangeStart(Math.min(x, 1 - end - 0.05)); // prevent crossing
+    } else {
+      onChangeEnd(Math.min(1 - x, 1 - start - 0.05));
     }
+  };
 
-    // Bottom edge (reverse)
-    for (let i = steps; i >= 0; i--) {
-      const t = i / steps;
-      const x = t * w;
-      let thickness = maxThickness;
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setDragTarget(null);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
-      const startTaper = size / 100;
-      if (t < startTaper) {
-        thickness *= t / startTaper;
-      }
+  const s = start;
+  const eVal = 1 - end;
 
-      const endTaper = 1 - pressure / 100;
-      if (t > endTaper && endTaper < 1) {
-        thickness *= (1 - t) / (1 - endTaper);
-      }
+  return (
+    <div 
+      ref={containerRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      style={{ position: 'relative', height: 70, background: 'var(--bs-slider-track)', borderRadius: 12, margin: '16px 0', cursor: 'ew-resize', touchAction: 'none' }}
+    >
+        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+           {/* Dynamic vertical lines at dot positions */}
+           <line x1={s * 100} y1="0" x2={s * 100} y2="100" stroke={document.documentElement.classList.contains("dark") ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.7)"} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+           <line x1={eVal * 100} y1="0" x2={eVal * 100} y2="100" stroke={document.documentElement.classList.contains("dark") ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.7)"} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+           
+           {/* Center horizontal line */}
+           <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(0,0,0,0.1)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+           
+           {/* Taper representation */}
+           <polygon 
+              points={`0,50 ${s * 100},25 ${eVal * 100},25 100,50 ${eVal * 100},75 ${s * 100},75`}
+              fill="rgba(0,0,0,0.3)"
+           />
+        </svg>
 
-      ctx.lineTo(x, midY + thickness);
-    }
+        <div style={{ position: 'absolute', left: `${s * 100}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, background: '#4df0ff', border: '1px solid rgba(0,0,0,0.5)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', left: `${eVal * 100}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, background: '#4df0ff', border: '1px solid rgba(0,0,0,0.5)', borderRadius: '50%' }} />
+    </div>
+  );
+}
 
-    ctx.closePath();
-    ctx.fill();
+// ── Utility: Smooth Catmull-Rom Spline SVG Path ────────────
+function getSplinePath(curve: {x:number, y:number}[]): string {
+  const n = curve.length;
+  if (n === 0) return "";
+  if (n === 1) return `M ${curve[0].x * 100} ${(1 - curve[0].y) * 100}`;
+  
+  let path = `M ${curve[0].x * 100} ${(1 - curve[0].y) * 100}`;
+  
+  if (n === 2) {
+    path += ` L ${curve[1].x * 100} ${(1 - curve[1].y) * 100}`;
+    return path;
+  }
 
-    // Draw handle dots
-    ctx.fillStyle = "#4a9eff";
-    ctx.beginPath();
-    ctx.arc(guideX1, midY, 5, 0, Math.PI * 2);
-    ctx.arc(guideX2, midY, 5, 0, Math.PI * 2);
-    ctx.fill();
-  }, [size, pressure]);
+  const p = [...curve];
+  // duplicate endpoints for Catmull-Rom
+  p.unshift(curve[0]);
+  p.push(curve[n - 1]);
 
-  return <canvas ref={canvasRef} className="bs-taper-curve" />;
+  for (let i = 1; i < p.length - 2; i++) {
+    const p0 = p[i - 1], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2];
+    
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    path += ` C ${cp1x * 100} ${(1 - cp1y) * 100}, ${cp2x * 100} ${(1 - cp2y) * 100}, ${p2.x * 100} ${(1 - p2.y) * 100}`;
+  }
+  
+  return path;
 }
 
 // ── Utility: Pressure Curve Widget ─────────────────────────
 function PressureCurveWidget({ value, onChange }: { value: { x: number; y: number }[]; onChange: (v: { x: number; y: number }[]) => void }) {
-  const size = 160;
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
@@ -263,15 +259,17 @@ function PressureCurveWidget({ value, onChange }: { value: { x: number; y: numbe
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
     const pt = getPt(e.clientX, e.clientY);
     
     // Check if clicking near an existing point
-    const threshold = 15 / size; // ~15px hit area
+    const threshold = 10; // 10px hit area
     let closestIdx = -1;
     let minD = Infinity;
     value.forEach((p, i) => {
-      const dx = p.x - pt.x;
-      const dy = p.y - pt.y;
+      const dx = p.x * rect.width - pt.x * rect.width;
+      const dy = p.y * rect.height - pt.y * rect.height;
       const d = Math.sqrt(dx*dx + dy*dy);
       if (d < threshold && d < minD) {
         minD = d;
@@ -314,7 +312,7 @@ function PressureCurveWidget({ value, onChange }: { value: { x: number; y: numbe
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
   
-  const pathData = value.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * size} ${(1 - p.y) * size}`).join(' ');
+  const pathData = getSplinePath(value);
 
   return (
     <div 
@@ -322,27 +320,27 @@ function PressureCurveWidget({ value, onChange }: { value: { x: number; y: numbe
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      style={{ position: 'relative', width: size, height: size, background: 'rgba(0,0,0,0.01)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 24px 0', cursor: 'crosshair', touchAction: 'none' }}
+      style={{ position: 'relative', width: 270, height: 270, background: 'rgba(0,0,0,0.01)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 24px 0', cursor: 'crosshair', touchAction: 'none' }}
     >
        {/* Grid Lines */}
-       <svg width={size} height={size} style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
-          {/* Vertical */}
-          <line x1={size*0.25} y1={0} x2={size*0.25} y2={size} stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-          <line x1={size*0.5} y1={0} x2={size*0.5} y2={size} stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-          <line x1={size*0.75} y1={0} x2={size*0.75} y2={size} stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-          {/* Horizontal */}
-          <line x1={0} y1={size*0.25} x2={size} y2={size*0.25} stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-          <line x1={0} y1={size*0.5} x2={size} y2={size*0.5} stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-          <line x1={0} y1={size*0.75} x2={size} y2={size*0.75} stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-          
-          {/* Curve Path */}
-          <path d={pathData} stroke="#444" strokeWidth="1.5" fill="none" />
-          
-          {/* Points */}
-          {value.map((p, i) => (
-             <circle key={i} cx={p.x * size} cy={(1 - p.y) * size} r={3.5} fill="#444" stroke="transparent" />
-          ))}
-       </svg>
+       <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
+            {/* Vertical */}
+            <line x1="25" y1="0" x2="25" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+            <line x1="50" y1="0" x2="50" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+            <line x1="75" y1="0" x2="75" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+            {/* Horizontal */}
+            <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+            <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+            
+            {/* Curve Path */}
+            <path d={pathData} stroke="#444" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
+            
+            {/* Points */}
+            {value.map((p, i) => (
+               <circle key={i} cx={p.x * 100} cy={(1 - p.y) * 100} r={2.5} fill="#444" stroke="transparent" />
+            ))}
+         </svg>
     </div>
   );
 }
@@ -350,10 +348,6 @@ function PressureCurveWidget({ value, onChange }: { value: { x: number; y: numbe
 // ── Utility: Tilt Widget ───────────────────────────────────
 function TiltWidget({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   // Value represents 0-90 degrees.
-  const size = 160;
-  const radius = size;
-  const cx = 0; // Bottom left corner
-  const cy = size; // Bottom left corner
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -361,8 +355,8 @@ function TiltWidget({ value, onChange }: { value: number; onChange: (v: number) 
   // Angle in radians (0 is right, 90 is up)
   const angleRad = value * (Math.PI / 180);
   
-  const dotX = cx + Math.cos(angleRad) * radius;
-  const dotY = cy - Math.sin(angleRad) * radius;
+  const dotX = Math.cos(angleRad) * 100;
+  const dotY = 100 - Math.sin(angleRad) * 100;
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -388,8 +382,8 @@ function TiltWidget({ value, onChange }: { value: number; onChange: (v: number) 
     const y = clientY - rect.top;
     
     // dx and dy relative to bottom-left origin
-    const dx = x - cx;
-    const dy = cy - y; // inverted y since screen y goes down
+    const dx = x - 0;
+    const dy = rect.height - y; // inverted y since screen y goes down
     
     let angle = Math.atan2(dy, dx) * (180 / Math.PI);
     // restrict to 0-90
@@ -405,22 +399,21 @@ function TiltWidget({ value, onChange }: { value: number; onChange: (v: number) 
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      style={{ position: 'relative', width: size, height: size, background: 'rgba(0,0,0,0.01)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 24px 0', cursor: 'pointer', touchAction: 'none' }}
+      style={{ position: 'relative', width: 270, height: 270, background: 'rgba(0,0,0,0.01)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 24px 0', cursor: 'pointer', touchAction: 'none' }}
     >
-       <svg width={size} height={size} style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
-          {/* Filled Quarter Circle Arc */}
-          {/* M 0 size (bottom left) -> L size size (bottom right) -> A size size 0 0 0 0 0 (arc to top left) -> Z (close) */}
-          <path d={`M 0 ${size} L ${size} ${size} A ${size} ${size} 0 0 0 0 0 Z`} fill="rgba(0,0,0,0.08)" />
-          
-          {/* Connecting line to the dot */}
-          <line x1={cx} y1={cy} x2={dotX} y2={dotY} stroke="#444" strokeWidth="1.5" />
-          
-          {/* The draggable dot at the edge of the circle */}
-          <circle cx={dotX} cy={dotY} r={3.5} fill="#444" stroke="transparent" style={{ pointerEvents: 'auto' }} />
-       </svg>
-       <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '11px', color: 'rgba(0,0,0,0.4)', pointerEvents: 'none' }}>
-          {Math.round(value)}°
-       </div>
+       <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
+            {/* Filled Quarter Circle Arc */}
+            <path d={`M 0 100 L 100 100 A 100 100 0 0 0 0 0 Z`} fill="rgba(0,0,0,0.08)" />
+            
+            {/* Connecting line to the dot */}
+            <line x1={0} y1={100} x2={dotX} y2={dotY} stroke="#444" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            
+            {/* The draggable dot at the edge of the circle */}
+            <circle cx={dotX} cy={dotY} r={2.5} fill="#444" stroke="transparent" style={{ pointerEvents: 'auto' }} />
+         </svg>
+         <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '11px', color: 'rgba(0,0,0,0.4)', pointerEvents: 'none' }}>
+            {Math.round(value)}°
+         </div>
     </div>
   );
 }
@@ -616,7 +609,12 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
   const renderTaper = () => (
     <>
       <div className="bs-section-title">Pressure taper</div>
-      <TaperCurvePreview size={localSettings.taperSize} pressure={localSettings.taperPressure} />
+      <TaperWidget 
+         start={localSettings.taperStart / 100} 
+         end={localSettings.taperEnd / 100} 
+         onChangeStart={(v) => updateSetting("taperStart", v * 100)} 
+         onChangeEnd={(v) => updateSetting("taperEnd", v * 100)} 
+      />
       <ToggleRow label="Link tip sizes" value={localSettings.taperLinkTips} onChange={(v) => updateSetting("taperLinkTips", v)} />
       <SliderRow label="Size" value={localSettings.taperSize} onChange={(v) => updateSetting("taperSize", v)} />
       <SliderRow label="Opacity" value={localSettings.taperOpacity} onChange={(v) => updateSetting("taperOpacity", v)} />

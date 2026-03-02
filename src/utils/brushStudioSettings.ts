@@ -14,7 +14,8 @@ export interface BrushStudioSettings {
   motionFilterAmount: number;
   motionFilterExpression: number;
   // Taper
-  // Taper
+  taperStart: number;
+  taperEnd: number;
   taperSize: number;
   taperOpacity: number;
   taperPressure: number;
@@ -67,6 +68,8 @@ export const DEFAULT_BRUSH_STUDIO_SETTINGS: BrushStudioSettings = {
   stabilizationAmount: 17,
   motionFilterAmount: 0,
   motionFilterExpression: 0,
+  taperStart: 0,
+  taperEnd: 0,
   taperSize: 50,
   taperOpacity: 15,
   taperPressure: 43,

@@ -447,18 +447,58 @@ export class BrushEngine {
     curve: { x: number; y: number }[],
     p: number,
   ): number {
-    if (!curve || curve.length === 0) return p;
+    const n = curve.length;
+    if (n === 0) return p;
     if (p <= curve[0].x) return curve[0].y;
-    if (p >= curve[curve.length - 1].x) return curve[curve.length - 1].y;
-    for (let i = 0; i < curve.length - 1; i++) {
-      const p1 = curve[i];
-      const p2 = curve[i + 1];
-      if (p >= p1.x && p <= p2.x) {
-        const t = (p - p1.x) / (p2.x - p1.x);
-        return p1.y + t * (p2.y - p1.y);
-      }
+    if (p >= curve[n - 1].x) return curve[n - 1].y;
+
+    if (n === 2) {
+      const t = (p - curve[0].x) / (curve[1].x - curve[0].x);
+      return curve[0].y + t * (curve[1].y - curve[0].y);
     }
-    return p;
+
+    const pts = [curve[0], ...curve, curve[n - 1]];
+
+    // Find enclosing segment based on X
+    let segIdx = 0;
+    while (segIdx < n - 1 && curve[segIdx + 1].x < p) {
+      segIdx++;
+    }
+
+    const p0 = pts[segIdx];
+    const p1 = pts[segIdx + 1];
+    const p2 = pts[segIdx + 2];
+    const p3 = pts[segIdx + 3];
+
+    // Evaluate cubic Bezier equivalent of Catmull-Rom for X and Y
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    // Binary search for t that yields X(t) == p
+    let tLow = 0,
+      tHigh = 1,
+      t = 0.5;
+    for (let i = 0; i < 15; i++) {
+      const inv = 1 - t;
+      const xt =
+        inv * inv * inv * p1.x +
+        3 * inv * inv * t * cp1x +
+        3 * inv * t * t * cp2x +
+        t * t * t * p2.x;
+      if (xt < p) tLow = t;
+      else tHigh = t;
+      t = (tLow + tHigh) / 2;
+    }
+
+    const inv = 1 - t;
+    const yt =
+      inv * inv * inv * p1.y +
+      3 * inv * inv * t * cp1y +
+      3 * inv * t * t * cp2y +
+      t * t * t * p2.y;
+    return Math.max(0, Math.min(1, yt));
   }
 
   public strokeTo(
