@@ -10,6 +10,7 @@
   --bs-border: rgba(0, 0, 0, 0.08);
   --bs-item-hover: rgba(0, 0, 0, 0.04);
   --bs-slider-track: rgba(134, 134, 134, 0.527);
+  --bs-slider-wrapper: rgba(190, 190, 190, 0.527);
   --bs-toggle-bg: rgba(0, 0, 0, 0.15);
   --bs-clear-btn-hover: rgba(0, 0, 0, 0.1);
 }
@@ -200,7 +201,7 @@
   align-items: center;
   padding: 4px;
   border-radius: 6px;
-  background-color: var(--bs-slider-track);
+  background-color: var(--bs-slider-wrapper);
 }
 
 /* Native range input (styled) */
@@ -218,6 +219,7 @@
 .bs-slider::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 4px;
+  background-color: var(--bs-slider-track);
 }
 
 .bs-slider::-webkit-slider-thumb {
