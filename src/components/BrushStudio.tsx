@@ -519,9 +519,10 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
       if (pressure === 0 && e.pointerType === "mouse") pressure = 0.5;
       const tiltX = e.tiltX || 0;
       const tiltY = e.tiltY || 0;
+      const twist = (e.nativeEvent as PointerEvent & { twist?: number }).twist || 0;
       
       padEngineRef.current?.startStroke(pos.x, pos.y);
-      padEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, 0.001);
+      padEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, 0.001, twist);
     },
     [getPos]
   );
@@ -548,8 +549,9 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
         
         const tiltX = ev.tiltX || 0;
         const tiltY = ev.tiltY || 0;
+        const twist = (ev as PointerEvent & { twist?: number }).twist || 0;
         
-        padEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, dtPerEvent);
+        padEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, dtPerEvent, twist);
       }
       
       lastTimeRef.current = now;

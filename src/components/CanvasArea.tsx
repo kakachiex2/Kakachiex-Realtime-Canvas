@@ -223,9 +223,10 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
 
     const tiltX = e.tiltX || 0;
     const tiltY = e.tiltY || 0;
+    const twist = (e.nativeEvent as PointerEvent & { twist?: number }).twist || 0;
 
     brushEngineRef.current?.startStroke(pos.x, pos.y);
-    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, 0.001); 
+    brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, 0.001, twist); 
   };
 
   const draw = (e: React.PointerEvent) => {
@@ -249,8 +250,9 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
 
       const tiltX = ev.tiltX || 0;
       const tiltY = ev.tiltY || 0;
+      const twist = (ev as PointerEvent & { twist?: number }).twist || 0;
 
-      brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, dtPerEvent);
+      brushEngineRef.current?.strokeTo(pos.x, pos.y, pressure, tiltX, tiltY, dtPerEvent, twist);
     }
     
     lastTime.current = now;

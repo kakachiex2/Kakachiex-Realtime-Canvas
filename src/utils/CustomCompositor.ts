@@ -114,6 +114,12 @@ export class CustomCompositor {
     mainCtx.globalCompositeOperation = this.getCompositeOperation(
       this.activeSettings.blendMode,
     );
+
+    // Luminance blending: convert to luminosity composite operation
+    if (this.activeSettings.luminanceBlending) {
+      mainCtx.globalCompositeOperation = "luminosity";
+    }
+
     mainCtx.drawImage(this.strokeCanvas, 0, 0);
     mainCtx.restore();
   }
@@ -134,25 +140,77 @@ export class CustomCompositor {
       return;
     }
 
-    const imgData = ctx.getImageData(0, 0, this.width, this.height);
+    const w = this.width;
+    const h = this.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
     const data = imgData.data;
     const threshold = (settings.thresholdAmount / 100) * 255;
     const wetAmount = settings.wetEdges / 100;
+    const burnAmount = settings.burnEdges / 100;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const alpha = data[i + 3];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const alpha = data[i + 3];
 
-      // 1. Alpha Threshold
-      if (settings.alphaThreshold && alpha < threshold) {
-        data[i + 3] = 0;
-      }
+        // 1. Alpha Threshold
+        if (settings.alphaThreshold && alpha < threshold) {
+          data[i + 3] = 0;
+          continue;
+        }
 
-      // 2. Wet Edge simulation approximation
-      if (wetAmount > 0 && alpha > 20 && alpha < 200) {
-        const wetFactor = 1.0 + wetAmount * 0.5;
-        data[i] = Math.min(255, data[i] * wetFactor);
-        data[i + 1] = Math.min(255, data[i + 1] * wetFactor);
-        data[i + 2] = Math.min(255, data[i + 2] * wetFactor);
+        if (alpha <= 5) continue;
+
+        // Detect edge pixels by checking neighbor alpha gradient
+        let isEdge = false;
+        if ((wetAmount > 0 || burnAmount > 0) && alpha > 10) {
+          // Sample neighbors (up, down, left, right)
+          const neighbors = [
+            y > 0 ? data[((y - 1) * w + x) * 4 + 3] : 0,
+            y < h - 1 ? data[((y + 1) * w + x) * 4 + 3] : 0,
+            x > 0 ? data[(y * w + (x - 1)) * 4 + 3] : 0,
+            x < w - 1 ? data[(y * w + (x + 1)) * 4 + 3] : 0,
+          ];
+          const minNeighborAlpha = Math.min(...neighbors);
+          const gradient = alpha - minNeighborAlpha;
+          isEdge = gradient > 30; // Significant alpha drop = edge
+        }
+
+        // 2. Wet Edge: darken boundary pixels where alpha gradient is steep
+        if (wetAmount > 0 && isEdge) {
+          const darken = 1.0 - wetAmount * 0.4;
+          data[i] = Math.max(0, data[i] * darken);
+          data[i + 1] = Math.max(0, data[i + 1] * darken);
+          data[i + 2] = Math.max(0, data[i + 2] * darken);
+          // Slightly boost alpha at edges to simulate paint pooling
+          data[i + 3] = Math.min(255, alpha + wetAmount * 40);
+        }
+
+        // 3. Burn Edge: darken edge pixels based on burnEdgesMode
+        if (burnAmount > 0 && isEdge) {
+          const burnMode = settings.burnEdgesMode;
+          const burnFactor = burnAmount * 0.6;
+          if (burnMode === "Multiply" || burnMode === "Linear Burn") {
+            data[i] = Math.max(0, data[i] * (1 - burnFactor));
+            data[i + 1] = Math.max(0, data[i + 1] * (1 - burnFactor));
+            data[i + 2] = Math.max(0, data[i + 2] * (1 - burnFactor));
+          } else if (burnMode === "Color Burn") {
+            // More aggressive darkening
+            data[i] = Math.max(0, data[i] - burnFactor * 80);
+            data[i + 1] = Math.max(0, data[i + 1] - burnFactor * 80);
+            data[i + 2] = Math.max(0, data[i + 2] - burnFactor * 80);
+          } else if (burnMode === "Overlay") {
+            // Overlay: darkens darks, lightens lights
+            for (let c = 0; c < 3; c++) {
+              const v = data[i + c] / 255;
+              const result =
+                v < 0.5
+                  ? 2 * v * v * (1 - burnFactor) + v * burnFactor * 0.3
+                  : 1 - 2 * (1 - v) * (1 - v) * (1 - burnFactor);
+              data[i + c] = Math.max(0, Math.min(255, result * 255));
+            }
+          }
+        }
       }
     }
 
