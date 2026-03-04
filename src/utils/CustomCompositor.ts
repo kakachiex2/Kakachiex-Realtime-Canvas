@@ -13,6 +13,10 @@ export class CustomCompositor {
   private width: number = 0;
   private height: number = 0;
 
+  // Grain texture cache
+  private grainTexture: ImageData | null = null;
+  private grainTextureKey: string = "";
+
   constructor() {
     this.strokeCanvas = document.createElement("canvas");
     this.strokeCtx = this.strokeCanvas.getContext("2d", {
@@ -211,6 +215,127 @@ export class CustomCompositor {
             }
           }
         }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    // 4. Grain texture overlay
+    this.applyGrainOverlay(ctx, settings);
+  }
+
+  /**
+   * Generate or retrieve a cached grain noise texture.
+   */
+  private getOrCreateGrainTexture(settings: BrushStudioSettings): ImageData {
+    const isMoving = settings.grainBehavior === "Moving";
+    const zoom = isMoving ? settings.grainMovingZoom : settings.grainTexZoom;
+    const scale = isMoving ? settings.grainMovingScale : settings.grainTexScale;
+    const key = `${this.width}x${this.height}_${zoom}_${scale}_${settings.grainBrightness}_${settings.grainContrast}`;
+
+    if (this.grainTexture && this.grainTextureKey === key) {
+      return this.grainTexture;
+    }
+
+    const w = this.width;
+    const h = this.height;
+    const imgData = new ImageData(w, h);
+    const data = imgData.data;
+    const texScale = Math.max(1, zoom / 50) * Math.max(1, (scale + 10) / 10);
+    const brightnessOffset = (settings.grainBrightness / 100) * 128;
+    const contrastFactor = 1 + settings.grainContrast / 100;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const sx = Math.floor(x / texScale) * 1337;
+        const sy = Math.floor(y / texScale) * 7919;
+        // Hash-based noise
+        let noise = (((sx ^ sy) * 2654435761) >>> 0) % 256;
+        // Apply brightness and contrast
+        noise = Math.max(
+          0,
+          Math.min(
+            255,
+            (noise - 128) * contrastFactor + 128 + brightnessOffset,
+          ),
+        );
+        const i = (y * w + x) * 4;
+        data[i] = data[i + 1] = data[i + 2] = noise;
+        data[i + 3] = 255;
+      }
+    }
+
+    this.grainTexture = imgData;
+    this.grainTextureKey = key;
+    return imgData;
+  }
+
+  /**
+   * Apply grain texture overlay to the stroke canvas.
+   * Grain modulates stroke pixel brightness/alpha using the noise texture.
+   */
+  private applyGrainOverlay(
+    ctx: CanvasRenderingContext2D,
+    settings: BrushStudioSettings,
+  ) {
+    const isMoving = settings.grainBehavior === "Moving";
+    const depth = isMoving ? settings.grainMovingDepth : settings.grainTexDepth;
+    const depthMin = isMoving
+      ? settings.grainMovingDepthMin
+      : settings.grainTexDepthMin;
+
+    // Skip if grain has no effect
+    if (depth <= 0) return;
+
+    const w = this.width;
+    const h = this.height;
+    const grain = this.getOrCreateGrainTexture(settings);
+    const grainData = grain.data;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    const depthFactor = depth / 100;
+    const minFactor = depthMin / 100;
+    const blendMode = settings.grainBlendMode;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      if (alpha <= 2) continue;
+
+      // Grain luminance (0-1)
+      const grainVal = grainData[i] / 255;
+
+      // Apply depth: mix between full effect and minimum
+      const effectStrength =
+        depthFactor * (grainVal * (1 - minFactor) + minFactor);
+
+      if (blendMode === "Multiply") {
+        data[i] = Math.max(0, data[i] * effectStrength);
+        data[i + 1] = Math.max(0, data[i + 1] * effectStrength);
+        data[i + 2] = Math.max(0, data[i + 2] * effectStrength);
+      } else if (blendMode === "Screen") {
+        data[i] = Math.min(
+          255,
+          255 - (255 - data[i]) * (1 - effectStrength * 0.5),
+        );
+        data[i + 1] = Math.min(
+          255,
+          255 - (255 - data[i + 1]) * (1 - effectStrength * 0.5),
+        );
+        data[i + 2] = Math.min(
+          255,
+          255 - (255 - data[i + 2]) * (1 - effectStrength * 0.5),
+        );
+      } else if (blendMode === "Overlay") {
+        for (let c = 0; c < 3; c++) {
+          const v = data[i + c] / 255;
+          const g = effectStrength;
+          const result = v < 0.5 ? 2 * v * g : 1 - 2 * (1 - v) * (1 - g);
+          data[i + c] = Math.max(0, Math.min(255, result * 255));
+        }
+      } else {
+        // Default: alpha-based depth modulation
+        data[i + 3] = Math.max(0, Math.min(255, alpha * effectStrength));
       }
     }
 

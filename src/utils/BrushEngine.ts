@@ -73,8 +73,21 @@ export class BrushEngine {
   private presetDirectionFilter: number = 2;
   private presetSmudge: number = 0;
   private presetSmudgeLength: number = 0.5;
+  // @ts-expect-error TS6133 — kept for future tilt angle preservation
   private presetEllipticalDabAngle: number = 0;
-  private presetOpaqueMultiply: number = 0;
+  private presetOpaqueLinearize: number = 0;
+  private presetSmudgeRadiusLog: number = 0;
+  private presetTrackingNoise: number = 0;
+
+  // New Native MyPaint Properties
+  private presetOpacityMultiply: number = 0;
+  private presetDabsPerSecond: number = 0;
+  private presetSpeed1Gamma: number = 0;
+  private presetSpeed2Gamma: number = 0;
+  private presetOffsetBySpeedSlowness: number = 0;
+  private presetStrokeThreshold: number = 0;
+  private presetStrokeHoldtime: number = 0;
+  private presetCustomInputSlowness: number = 0;
 
   // Taper: stroke distance tracking
   private strokeDistance: number = 0;
@@ -175,7 +188,10 @@ export class BrushEngine {
     BrushEngine.presets = loaded;
   }
 
+  public currentBrushName: string = "";
+
   public setBrush(name: string) {
+    this.currentBrushName = name;
     const preset = BrushEngine.presets.find((p) => p.name === name);
     if (preset) {
       this.brush = new MypaintBrush(preset.setting, this.surface);
@@ -209,8 +225,29 @@ export class BrushEngine {
         this.brush.settings[BRUSH.SMUDGE_LENGTH].base_value;
       this.presetEllipticalDabAngle =
         this.brush.settings[BRUSH.ELLIPTICAL_DAB_ANGLE].base_value;
-      this.presetOpaqueMultiply =
+      this.presetOpaqueLinearize =
+        this.brush.settings[BRUSH.OPAQUE_LINEARIZE].base_value;
+      this.presetSmudgeRadiusLog =
+        this.brush.settings[BRUSH.SMUDGE_RADIUS_LOG].base_value;
+      this.presetTrackingNoise =
+        this.brush.settings[BRUSH.TRACKING_NOISE].base_value;
+
+      this.presetOpacityMultiply =
         this.brush.settings[BRUSH.OPAQUE_MULTIPLY].base_value;
+      this.presetDabsPerSecond =
+        this.brush.settings[BRUSH.DABS_PER_SECOND].base_value;
+      this.presetSpeed1Gamma =
+        this.brush.settings[BRUSH.SPEED1_GAMMA].base_value;
+      this.presetSpeed2Gamma =
+        this.brush.settings[BRUSH.SPEED2_GAMMA].base_value;
+      this.presetOffsetBySpeedSlowness =
+        this.brush.settings[BRUSH.OFFSET_BY_SPEED_SLOWNESS].base_value;
+      this.presetStrokeThreshold =
+        this.brush.settings[BRUSH.STROKE_THRESHOLD].base_value;
+      this.presetStrokeHoldtime =
+        this.brush.settings[BRUSH.STROKE_HOLDTIME].base_value;
+      this.presetCustomInputSlowness =
+        this.brush.settings[BRUSH.CUSTOM_INPUT_SLOWNESS].base_value;
     }
   }
 
@@ -229,53 +266,76 @@ export class BrushEngine {
     // The slider ranges 1-100. Let's make 10 = 1.0x native size.
     // MyPaint radius is logarithmic, so scale is expressed by addition.
     const scale = size / 10;
+    const maxScale = this.activeSettings
+      ? this.activeSettings.maxSize / 100
+      : 1.0;
     this.brush.settings[BRUSH.RADIUS_LOGARITHMIC].base_value =
-      this.defaultBaseRadius + Math.log(scale);
+      this.defaultBaseRadius + Math.log(scale * maxScale);
   }
 
   public setOpacity(opacity: number) {
     if (!this.brush) return;
-    // Store the user-facing opacity so we can combine it with flow
+    // Store the user-facing opacity so we can combine it with flow and maxOpacity
     this.userOpacity = opacity;
-    // Multiply with current flow factor (will be recalculated on next applyStudioSettings)
+    // We update the actual engine value inside applyStudioSettings where we have access
+    // to activeSettings.maxOpacity. If it's not set yet, just do a basic multiply.
+    const maxOpacFactor = this.activeSettings
+      ? this.activeSettings.maxOpacity / 100
+      : 1.0;
     this.brush.settings[BRUSH.OPAQUE].base_value =
-      this.defaultBaseOpacity * opacity;
+      this.defaultBaseOpacity * opacity * maxOpacFactor;
   }
 
   /**
-   * Inject a 2-point input mapping curve on a BRUSH setting's pointsList.
-   * inputIdx corresponds to INPUT.PRESSURE (0), INPUT.TILT_DECLINATION (6), etc.
-   * This maps input range [x0..x1] to output range [y0..y1].
+   * Scale an existing native curve or inject a new one if missing.
+   * If sliderValue == 50, scaleFactor is 1.0 (no change to native).
+   * If native missing and sliderValue > 0, injects standard curve.
    */
-  private injectInputCurve(
+  private scaleOrInjectInputCurve(
     brushSettingIdx: number,
     inputIdx: number,
+    sliderValue: number, // 0 to 100
     x0: number,
     y0: number,
     x1: number,
-    y1: number,
+    y1: number, // Default inject values if curve missing
+    alternativeSettingIdx?: number,
   ) {
-    const mapping = this.brush.settings[brushSettingIdx];
-    if (!mapping || !mapping.pointsList) return;
-    const pts = mapping.pointsList[inputIdx];
-    if (!pts) return;
-    pts.n = 2;
-    pts.xvalues[0] = x0;
-    pts.yvalues[0] = y0;
-    pts.xvalues[1] = x1;
-    pts.yvalues[1] = y1;
-    mapping.inputs_used = 1;
-  }
+    let mapping = this.brush.settings[brushSettingIdx];
+    let pts =
+      mapping && mapping.pointsList ? mapping.pointsList[inputIdx] : null;
 
-  /**
-   * Clear an input mapping curve (set n=0) so it has no effect.
-   */
-  private clearInputCurve(brushSettingIdx: number, inputIdx: number) {
-    const mapping = this.brush.settings[brushSettingIdx];
-    if (!mapping || !mapping.pointsList) return;
-    const pts = mapping.pointsList[inputIdx];
-    if (!pts) return;
-    pts.n = 0;
+    if (alternativeSettingIdx !== undefined) {
+      const altMapping = this.brush.settings[alternativeSettingIdx];
+      const altPts =
+        altMapping && altMapping.pointsList
+          ? altMapping.pointsList[inputIdx]
+          : null;
+      if (altPts && altPts.n >= 2 && (!pts || pts.n < 2)) {
+        mapping = altMapping;
+        pts = altPts;
+      }
+    }
+
+    if (!mapping || !pts) return;
+
+    if (pts.n >= 2) {
+      // Native curve exists. Scale its magnitude. 50 = no change (1.0).
+      const scaleFactor = sliderValue / 50;
+      for (let i = 0; i < pts.n; i++) {
+        pts.yvalues[i] *= scaleFactor;
+      }
+    } else {
+      // Native curve missing. Inject standard UI-driven curve if slider > 0.
+      if (sliderValue > 0) {
+        pts.n = 2;
+        pts.xvalues[0] = x0;
+        pts.yvalues[0] = y0 * (sliderValue / 100);
+        pts.xvalues[1] = x1;
+        pts.yvalues[1] = y1 * (sliderValue / 100);
+        mapping.inputs_used = 1;
+      }
+    }
   }
 
   /**
@@ -283,285 +343,671 @@ export class BrushEngine {
    * Maps UI slider values (0-100%) to actual MyPaint BRUSH parameters.
    */
   public applyStudioSettings(s: BrushStudioSettings) {
-    if (!this.brush) return;
+    if (!this.brush || !this.currentBrushName) return;
+
+    // Reset brush to pristine JSON state to clear any previous scaled/injected curves
+    const preset = BrushEngine.presets.find(
+      (p) => p.name === this.currentBrushName,
+    );
+    if (preset) {
+      for (let i = 0; i < this.brush.settings.length; i++) {
+        const m = this.brush.settings[i];
+        if (!m) continue;
+        m.inputs_used = 0;
+        if (m.pointsList) {
+          for (let j = 0; j < m.pointsList.length; j++) {
+            if (m.pointsList[j]) m.pointsList[j].n = 0;
+          }
+        }
+      }
+      this.brush.readmyb_json(preset.setting);
+    }
 
     // ── STROKE PROPERTIES ──────────────────────────────────
 
     // Spacing: controls dab density. spacing=1% → dense, spacing=100% → sparse
-    const spacingFactor = Math.max(0.1, 1.0 / ((s.spacing / 100) * 3 + 0.1));
+    const spacingFactor =
+      s.spacing > 0 ? Math.max(0.1, 1.0 / ((s.spacing / 100) * 3 + 0.1)) : 1.0;
+    const countMultiplier = Math.max(1, s.shapeCount || 1);
     this.brush.settings[BRUSH.DABS_PER_BASIC_RADIUS].base_value =
-      this.presetDabsPerBasicRadius * spacingFactor;
+      this.presetDabsPerBasicRadius * spacingFactor * countMultiplier;
     this.brush.settings[BRUSH.DABS_PER_ACTUAL_RADIUS].base_value =
-      this.presetDabsPerActualRadius * spacingFactor;
+      this.presetDabsPerActualRadius * spacingFactor * countMultiplier;
+
+    this.scaleOrInjectInputCurve(
+      BRUSH.DABS_PER_BASIC_RADIUS,
+      INPUT.RANDOM,
+      s.spacingJitter ?? 0,
+      0,
+      0,
+      1.0,
+      1.0,
+    );
 
     // Spacing Jitter: randomness to radius → visual spacing variation
-    this.brush.settings[BRUSH.RADIUS_BY_RANDOM].base_value =
-      (s.spacingJitter / 100) * 1.5;
-
-    // Jitter Lateral: random offset perpendicular to stroke direction
-    this.brush.settings[BRUSH.OFFSET_BY_RANDOM].base_value =
-      this.presetOffsetByRandom + (s.jitterLateral / 100) * 3.0;
-
-    // Jitter Linear: offset along stroke direction (speed-based)
-    this.brush.settings[BRUSH.OFFSET_BY_SPEED].base_value =
-      this.presetOffsetBySpeed + (s.jitterLinear / 100) * 2.0;
-
-    // Fall off: hardness of the dab edge. 0%=soft, 100%=crisp
-    this.brush.settings[BRUSH.HARDNESS].base_value =
-      this.presetHardness * (1 - s.fallOff / 100) + s.fallOff / 100;
-
-    // ── STABILIZATION ──────────────────────────────────────
-
-    this.brush.settings[BRUSH.SLOW_TRACKING].base_value =
-      this.presetSlowTracking + (s.streamlineAmount / 100) * 15.0;
-
-    this.brush.settings[BRUSH.SLOW_TRACKING_PER_DAB].base_value =
-      this.presetSlowTrackingPerDab + (s.streamlinePressure / 100) * 8.0;
-
-    this.brush.settings[BRUSH.SPEED1_SLOWNESS].base_value =
-      this.presetSpeed1Slowness + (s.stabilizationAmount / 100) * 5.0;
-
-    this.brush.settings[BRUSH.SPEED2_SLOWNESS].base_value =
-      this.presetSpeed2Slowness + (s.motionFilterAmount / 100) * 6.0;
-
-    this.brush.settings[BRUSH.DIRECTION_FILTER].base_value =
-      this.presetDirectionFilter + (s.motionFilterExpression / 100) * 10.0;
-
-    // ── TAPER ──────────────────────────────────────────────
-    // taperStart / taperEnd are handled in strokeTo() via distance tracking.
-    // taperSize and taperOpacity modify the pressure→radius and pressure→opacity curves.
-
-    const radiusMapping = this.brush.settings[BRUSH.RADIUS_LOGARITHMIC];
-    const taperSizeFactor = s.taperSize / 100;
-    if (radiusMapping.pointsList) {
-      const pressurePts = radiusMapping.pointsList[INPUT.PRESSURE];
-      if (pressurePts && pressurePts.n >= 2) {
-        const range = taperSizeFactor * 1.5;
-        pressurePts.yvalues[0] = -range;
-        pressurePts.yvalues[pressurePts.n - 1] = range * 0.5;
-      }
+    if (s.spacingJitter > 0) {
+      this.brush.settings[BRUSH.RADIUS_BY_RANDOM].base_value =
+        (s.spacingJitter / 100) * 1.5;
     }
 
-    const opacityMapping = this.brush.settings[BRUSH.OPAQUE_MULTIPLY];
-    const taperOpacityFactor = s.taperOpacity / 100;
-    if (opacityMapping.pointsList) {
-      const pressurePts = opacityMapping.pointsList[INPUT.PRESSURE];
-      if (pressurePts && pressurePts.n >= 2) {
-        pressurePts.yvalues[0] = -taperOpacityFactor;
-        pressurePts.yvalues[pressurePts.n - 1] = taperOpacityFactor;
-      }
+    // Jitter Lateral: random offset perpendicular to stroke direction (single write)
+    if (s.jitterLateral > 0) {
+      this.brush.settings[BRUSH.OFFSET_BY_RANDOM].base_value =
+        this.presetOffsetByRandom + (s.jitterLateral / 100) * 3.0;
     }
 
-    // Taper Pressure: stroke threshold
-    const pressureThreshold = (1 - s.taperPressure / 100) * 0.1;
-    this.brush.settings[BRUSH.STROKE_THRESHOLD].base_value = pressureThreshold;
+    // Jitter Linear: tracking noise + offset along stroke direction (single write each)
+    if (s.jitterLinear > 0) {
+      this.brush.settings[BRUSH.TRACKING_NOISE].base_value =
+        this.presetTrackingNoise + s.jitterLinear / 50;
+      this.brush.settings[BRUSH.OFFSET_BY_SPEED].base_value =
+        this.presetOffsetBySpeed + (s.jitterLinear / 100) * 2.0;
+    }
 
-    // Taper Tip: elliptical dab ratio. 0=sharp (1.0), 100=square (3.0)
-    const tipRatio = 1.0 + (s.taperTip / 100) * 2.0;
-    this.brush.settings[BRUSH.ELLIPTICAL_DAB_RATIO].base_value = tipRatio;
+    // Native stroke MyPaint params (guarded — only touch if slider moved from default 0)
+    if (s.dabsPerSecond !== 0) {
+      this.brush.settings[BRUSH.DABS_PER_SECOND].base_value =
+        this.presetDabsPerSecond + s.dabsPerSecond;
+    }
+    if (s.strokeHoldtime !== 0) {
+      this.brush.settings[BRUSH.STROKE_HOLDTIME].base_value =
+        this.presetStrokeHoldtime + s.strokeHoldtime / 10;
+    }
 
-    // Taper Tip Animation: controls stroke duration behavior
+    // HARDNESS: consolidated single write. fallOff=0 + shapeHardness=50 → preserve native
+    {
+      let h = this.presetHardness;
+      if (s.fallOff > 0) {
+        h = h * (1 - s.fallOff / 100) + s.fallOff / 100;
+      }
+      if (s.shapeHardness !== 50) {
+        h = Math.max(0, h + (s.shapeHardness - 50) / 50);
+      }
+      this.brush.settings[BRUSH.HARDNESS].base_value = h;
+    }
+
+    // ── STABILIZATION (consolidated single writes) ──────────
+    // SLOW_TRACKING: native param + streamlineAmount, consolidated
+    {
+      let st = this.presetSlowTracking;
+      if (s.slowTracking !== 0) st += s.slowTracking / 20;
+      if (s.streamlineAmount > 0) st += (s.streamlineAmount / 100) * 15.0;
+      this.brush.settings[BRUSH.SLOW_TRACKING].base_value = st;
+    }
+
+    // SLOW_TRACKING_PER_DAB: native param + streamlinePressure, consolidated
+    {
+      let stpd = this.presetSlowTrackingPerDab;
+      if (s.slowTrackingPerDab !== 0) stpd += s.slowTrackingPerDab / 20;
+      if (s.streamlinePressure > 0) stpd += (s.streamlinePressure / 100) * 8.0;
+      this.brush.settings[BRUSH.SLOW_TRACKING_PER_DAB].base_value = stpd;
+    }
+
+    // SPEED1_SLOWNESS: native param + stabilization, consolidated
+    {
+      let s1s = this.presetSpeed1Slowness;
+      if (s.speed1Slowness !== 50) s1s *= s.speed1Slowness / 50;
+      if (s.stabilizationAmount > 0) s1s += (s.stabilizationAmount / 100) * 5.0;
+      this.brush.settings[BRUSH.SPEED1_SLOWNESS].base_value = s1s;
+    }
+
+    // SPEED2_SLOWNESS: native param + motionFilter, consolidated
+    {
+      let s2s = this.presetSpeed2Slowness;
+      if (s.speed2Slowness !== 50) s2s *= s.speed2Slowness / 50;
+      if (s.motionFilterAmount > 0) s2s += (s.motionFilterAmount / 100) * 6.0;
+      this.brush.settings[BRUSH.SPEED2_SLOWNESS].base_value = s2s;
+    }
+
+    // DIRECTION_FILTER: native param + motionFilterExpression, consolidated
+    {
+      let df = this.presetDirectionFilter;
+      if (s.directionFilter !== 50) df += (s.directionFilter - 50) / 10;
+      if (s.motionFilterExpression > 0)
+        df += (s.motionFilterExpression / 100) * 10.0;
+      this.brush.settings[BRUSH.DIRECTION_FILTER].base_value = df;
+    }
+
+    // ── PROPERTIES ─────────────────────────────────────────
+    if (s.opacityMultiply !== 50) {
+      this.brush.settings[BRUSH.OPAQUE_MULTIPLY].base_value =
+        this.presetOpacityMultiply + (s.opacityMultiply - 50) / 25;
+    }
+
+    // STROKE_THRESHOLD: guarded — only overwrite if taperPressure > 0 OR strokeThreshold slider moved
+    if (s.taperPressure > 0 || s.strokeThreshold !== 0) {
+      let thresh = this.presetStrokeThreshold;
+      if (s.taperPressure > 0) thresh = (1 - s.taperPressure / 100) * 0.1;
+      if (s.strokeThreshold !== 0) thresh += s.strokeThreshold / 50;
+      this.brush.settings[BRUSH.STROKE_THRESHOLD].base_value = thresh;
+    }
+
+    // Taper Tip Animation: controls stroke duration behavior (only if explicitly toggled)
     if (s.taperTipAnimation) {
       this.brush.settings[BRUSH.STROKE_DURATION_LOGARITHMIC].base_value = 4.0;
-    } else {
-      this.brush.settings[BRUSH.STROKE_DURATION_LOGARITHMIC].base_value = 0;
     }
 
     // ── RENDERING ──────────────────────────────────────────
-    // Combine flow, user opacity, and pressureFlow into the OPAQUE base value
     const flowFactor = s.flow / 100;
     const pressureFlowFactor = s.pressureFlow / 100;
-    this.brush.settings[BRUSH.OPAQUE].base_value =
+    const maxOpacFactor = s.maxOpacity / 100;
+    const minOpacFactor = s.minOpacity / 100;
+
+    this.brush.settings[BRUSH.OPAQUE].base_value = Math.max(
+      minOpacFactor,
       this.defaultBaseOpacity *
-      this.userOpacity *
-      flowFactor *
-      pressureFlowFactor;
+        this.userOpacity *
+        flowFactor *
+        pressureFlowFactor *
+        maxOpacFactor,
+    );
 
     // Store settings so compositor can use them during stroke
     this.activeSettings = s;
 
+    // ── SMUDGE: consolidated single write ──────────────────
+    {
+      let sm = this.presetSmudge;
+      if (s.smudgePull > 0) sm += s.smudgePull / 100;
+      if (s.wetMixPull > 0) sm += s.wetMixPull / 100;
+      this.brush.settings[BRUSH.SMUDGE].base_value = sm;
+    }
+
+    // ── SHAPE (consolidated — ELLIPTICAL_DAB_RATIO written once) ──
+    // shapeRoundness (100% = 1.0 ratio = round, 0% = 10.0 ratio = flat)
+    const baseRatio = 1.0 + ((100 - (s.shapeRoundness ?? 100)) / 100) * 9.0;
+    // Only overwrite native ratio if the user changed roundness from 100 or taperTip from 0
+    if (s.shapeRoundness !== 100 || s.taperTip > 0) {
+      const tipRatio = s.taperTip > 0 ? 1.0 + (s.taperTip / 100) * 2.0 : 1.0;
+      this.brush.settings[BRUSH.ELLIPTICAL_DAB_RATIO].base_value = Math.max(
+        baseRatio,
+        tipRatio,
+      );
+    }
+
+    // shapeRotation (degrees 0 - 360) — only overwrite if non-zero
+    if (s.shapeRotation !== 0) {
+      this.brush.settings[BRUSH.ELLIPTICAL_DAB_ANGLE].base_value =
+        s.shapeRotation;
+    }
+
+    // shapeScatter (Rotation random scatter: offsets dab angle across random inputs)
+    this.scaleOrInjectInputCurve(
+      BRUSH.ELLIPTICAL_DAB_ANGLE,
+      INPUT.RANDOM,
+      s.shapeScatter ?? 0,
+      0.0,
+      -180.0,
+      1.0,
+      180.0,
+    );
+
+    // shapePressureRoundness (Compress ratio dynamically based on Pressure)
+    this.scaleOrInjectInputCurve(
+      BRUSH.ELLIPTICAL_DAB_RATIO,
+      INPUT.PRESSURE,
+      s.shapePressureRoundness ?? 0,
+      0.0,
+      -baseRatio + 1.0,
+      1.0,
+      0.0,
+    );
+
+    // shapeTiltRoundness
+    this.scaleOrInjectInputCurve(
+      BRUSH.ELLIPTICAL_DAB_RATIO,
+      INPUT.TILT_DECLINATION,
+      s.shapeTiltRoundness ?? 0,
+      0.0,
+      -baseRatio + 1.0,
+      1.0,
+      0.0,
+    );
+
+    // shapeRoundnessVerticalJitter / Horizontal Jitter → Random Roundness Jitter
+    const totalRoundnessJitter = Math.max(
+      s.shapeRoundnessVerticalJitter ?? 0,
+      s.shapeRoundnessHorizontalJitter ?? 0,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.ELLIPTICAL_DAB_RATIO,
+      INPUT.RANDOM,
+      totalRoundnessJitter,
+      0.0,
+      0.0,
+      1.0,
+      5.0,
+    );
+
+    // ── WET MIX ────────────────────────────────────────────
+    // NOTE: SMUDGE base_value is already consolidated in the single write above.
+    // We still handle the curves (jitter, random) here.
+
+    // Charge: How much paint is on the brush. Low charge = runs out of paint.
+    const chargeVal = Math.max(0, 100 - (s.wetMixCharge ?? 50));
+    if (chargeVal > 0 && !s.taperTipAnimation) {
+      this.brush.settings[BRUSH.STROKE_DURATION_LOGARITHMIC].base_value =
+        chargeVal / 20;
+    }
+
+    // Dilution: amount of water
+    if ((s.wetMixDilution ?? 0) > 0) {
+      this.brush.settings[BRUSH.SMUDGE_LENGTH].base_value =
+        this.presetSmudgeLength + s.wetMixDilution / 100;
+      this.brush.settings[BRUSH.OPAQUE_LINEARIZE].base_value =
+        this.presetOpaqueLinearize + (s.wetMixDilution / 100) * 0.5;
+    }
+
+    // Grade: smoothness of smudge
+    if ((s.wetMixGrade ?? 0) > 0) {
+      this.brush.settings[BRUSH.SMUDGE_RADIUS_LOG].base_value =
+        this.presetSmudgeRadiusLog + (s.wetMixGrade / 100) * 2.0;
+    }
+
+    // Blur: Tracking noise
+    if ((s.wetMixBlur ?? 0) > 0) {
+      this.brush.settings[BRUSH.TRACKING_NOISE].base_value =
+        this.presetTrackingNoise + (s.wetMixBlur / 100) * 3.0;
+    }
+
+    // Blur Jitter
+    this.scaleOrInjectInputCurve(
+      BRUSH.TRACKING_NOISE,
+      INPUT.RANDOM,
+      s.wetMixBlurJitter ?? 0,
+      0.0,
+      0.0,
+      1.0,
+      3.0,
+    );
+
+    // Wetness Jitter
+    this.scaleOrInjectInputCurve(
+      BRUSH.SMUDGE,
+      INPUT.RANDOM,
+      s.wetMixWetnessJitter ?? 0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+    );
+
+    // ── DYNAMICS ───────────────────────────────────────────
+
+    // Native Slowness & Gamma Smoothing
+    if (s.speed1Slowness !== 50)
+      this.brush.settings[BRUSH.SPEED1_SLOWNESS].base_value =
+        this.presetSpeed1Slowness * ((s.speed1Slowness ?? 50) / 50);
+    if (s.speed2Slowness !== 50)
+      this.brush.settings[BRUSH.SPEED2_SLOWNESS].base_value =
+        this.presetSpeed2Slowness * ((s.speed2Slowness ?? 50) / 50);
+    if (s.speed1Gamma !== 50)
+      this.brush.settings[BRUSH.SPEED1_GAMMA].base_value =
+        this.presetSpeed1Gamma + ((s.speed1Gamma ?? 50) - 50) / 25;
+    if (s.speed2Gamma !== 50)
+      this.brush.settings[BRUSH.SPEED2_GAMMA].base_value =
+        this.presetSpeed2Gamma + ((s.speed2Gamma ?? 50) - 50) / 25;
+    if (s.offsetBySpeedSlowness !== 50)
+      this.brush.settings[BRUSH.OFFSET_BY_SPEED_SLOWNESS].base_value =
+        this.presetOffsetBySpeedSlowness *
+        ((s.offsetBySpeedSlowness ?? 50) / 50);
+
+    // Speed -> Size
+    this.scaleOrInjectInputCurve(
+      BRUSH.RADIUS_LOGARITHMIC,
+      INPUT.SPEED1,
+      s.dynamicsSpeedSize ?? 0,
+      0.0,
+      -2.0,
+      1.0,
+      2.0,
+    );
+
+    // Speed -> Opacity
+    this.scaleOrInjectInputCurve(
+      BRUSH.OPAQUE,
+      INPUT.SPEED1,
+      s.dynamicsSpeedOpacity ?? 0,
+      0.0,
+      -1.0,
+      1.0,
+      1.0,
+    );
+
+    // Speed -> Spacing
+    this.brush.settings[BRUSH.OFFSET_BY_SPEED].base_value +=
+      ((s.dynamicsSpeedSpacing ?? 0) / 100) * 2.5;
+
+    // Jitter -> Size
+    this.scaleOrInjectInputCurve(
+      BRUSH.RADIUS_LOGARITHMIC,
+      INPUT.RANDOM,
+      s.dynamicsJitterSize ?? 0,
+      0.0,
+      0.0,
+      1.0,
+      2.0,
+    );
+
+    // Jitter -> Opacity
+    this.scaleOrInjectInputCurve(
+      BRUSH.OPAQUE,
+      INPUT.RANDOM,
+      s.dynamicsJitterOpacity ?? 0,
+      0.0,
+      -1.0,
+      1.0,
+      1.0,
+    );
+
+    // ── COLOR DYNAMICS ─────────────────────────────────────
+
+    // Stamp Jitter (Random base values)
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_HUE,
+      INPUT.RANDOM,
+      s.colorStampHue ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_SATURATION,
+      INPUT.RANDOM,
+      s.colorStampSaturation ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.RANDOM,
+      s.colorStampLightness ?? 0,
+      0.0,
+      0.0,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.RANDOM,
+      s.colorStampDarkness ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.0,
+    );
+
+    // Stroke Jitter (Speed based)
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_HUE,
+      INPUT.SPEED1,
+      s.colorStrokeHue ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_SATURATION,
+      INPUT.SPEED1,
+      s.colorStrokeSaturation ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.SPEED1,
+      s.colorStrokeLightness ?? 0,
+      0.0,
+      0.0,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.SPEED1,
+      s.colorStrokeDarkness ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.0,
+    );
+
+    // Color Pressure
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_HUE,
+      INPUT.PRESSURE,
+      s.colorPressureHue ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_SATURATION,
+      INPUT.PRESSURE,
+      s.colorPressureSaturation ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.PRESSURE,
+      s.colorPressureBrightness ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+
+    // Color Tilt
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_HUE,
+      INPUT.TILT_DECLINATION,
+      s.colorTiltHue ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_SATURATION,
+      INPUT.TILT_DECLINATION,
+      s.colorTiltSaturation ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.TILT_DECLINATION,
+      s.colorTiltBrightness ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+
+    // Color Barrel Roll
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_HUE,
+      INPUT.CUSTOM,
+      s.colorBarrelHue ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_SATURATION,
+      INPUT.CUSTOM,
+      s.colorBarrelSaturation ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+    this.scaleOrInjectInputCurve(
+      BRUSH.COLOR_VALUE,
+      INPUT.CUSTOM,
+      s.colorBarrelBrightness ?? 0,
+      0.0,
+      -0.5,
+      1.0,
+      0.5,
+    );
+
+    if (s.customInputSlowness !== 0) {
+      this.brush.settings[BRUSH.CUSTOM_INPUT_SLOWNESS].base_value =
+        this.presetCustomInputSlowness + (s.customInputSlowness ?? 0) / 20;
+    }
+
     // ── PENCIL & STYLUS — PRESSURE ─────────────────────────
 
-    // Pressure → Size: inject an input curve on RADIUS_LOGARITHMIC via INPUT.PRESSURE
-    // so that light pressure = smaller, heavy pressure = bigger
-    if (s.pressureSize > 0) {
-      const sizeRange = (s.pressureSize / 100) * 2.0; // up to 2.0 log-radius range
-      this.injectInputCurve(
-        BRUSH.RADIUS_LOGARITHMIC,
-        INPUT.PRESSURE,
-        0.0,
-        -sizeRange, // at zero pressure: shrink
-        1.0,
-        sizeRange * 0.3, // at full pressure: slight grow
-      );
-    } else {
-      this.clearInputCurve(BRUSH.RADIUS_LOGARITHMIC, INPUT.PRESSURE);
-    }
+    // Pressure → Size
+    const minSizeScale = Math.max(0.01, s.minSize / 100);
+    const minSizeLogFloor = Math.log(minSizeScale);
+    this.scaleOrInjectInputCurve(
+      BRUSH.RADIUS_LOGARITHMIC,
+      INPUT.PRESSURE,
+      s.pressureSize,
+      0.0,
+      Math.max(-2.0, minSizeLogFloor),
+      1.0,
+      0.6,
+    );
 
-    // Pressure → Opacity: inject an input curve on OPAQUE_MULTIPLY via INPUT.PRESSURE
-    // so that light pressure = transparent, heavy pressure = opaque
-    if (s.pressureOpacity > 0) {
-      const opacRange = (s.pressureOpacity / 100) * 1.0;
-      this.brush.settings[BRUSH.OPAQUE_MULTIPLY].base_value =
-        this.presetOpaqueMultiply;
-      this.injectInputCurve(
-        BRUSH.OPAQUE_MULTIPLY,
-        INPUT.PRESSURE,
-        0.0,
-        -opacRange, // at zero pressure: reduce opacity
-        1.0,
-        0.0, // at full pressure: normal opacity
-      );
-    }
+    // Pressure → Opacity
+    this.scaleOrInjectInputCurve(
+      BRUSH.OPAQUE,
+      INPUT.PRESSURE,
+      s.pressureOpacity,
+      0.0,
+      -0.7,
+      1.0,
+      0.0,
+      BRUSH.OPAQUE_MULTIPLY,
+    );
 
-    // Pressure → Bleed (smudge): connect to SMUDGE parameter
+    // Pressure → Bleed: additive smudge boost (SMUDGE base is consolidated above)
     if (s.pressureBleed > 0) {
-      this.brush.settings[BRUSH.SMUDGE].base_value =
-        this.presetSmudge + (s.pressureBleed / 100) * 0.8;
+      this.brush.settings[BRUSH.SMUDGE].base_value +=
+        (s.pressureBleed / 100) * 0.8;
       this.brush.settings[BRUSH.SMUDGE_LENGTH].base_value =
         this.presetSmudgeLength + (s.pressureBleed / 100) * 0.3;
-    } else {
-      this.brush.settings[BRUSH.SMUDGE].base_value = this.presetSmudge;
-      this.brush.settings[BRUSH.SMUDGE_LENGTH].base_value =
-        this.presetSmudgeLength;
     }
 
     // ── PENCIL & STYLUS — TILT ─────────────────────────────
 
     // Tilt → Angle: map tilt ascension to elliptical dab angle rotation
-    if (s.tiltAngle > 0) {
-      const angleRange = (s.tiltAngle / 90) * 180; // scale the dab rotation
-      this.brush.settings[BRUSH.ELLIPTICAL_DAB_ANGLE].base_value =
-        this.presetEllipticalDabAngle;
-      this.injectInputCurve(
-        BRUSH.ELLIPTICAL_DAB_ANGLE,
-        INPUT.TILT_ASCENSION,
-        -180.0,
-        -angleRange,
-        180.0,
-        angleRange,
-      );
-    } else {
-      this.clearInputCurve(BRUSH.ELLIPTICAL_DAB_ANGLE, INPUT.TILT_ASCENSION);
-    }
+    // NOTE: DAB_ANGLE base_value is already set correctly by the SHAPE section above.
+    this.scaleOrInjectInputCurve(
+      BRUSH.ELLIPTICAL_DAB_ANGLE,
+      INPUT.TILT_ASCENSION,
+      s.tiltAngle,
+      -180.0,
+      -180.0,
+      180.0,
+      180.0,
+    );
 
     // Tilt → Opacity: more tilt = lower opacity (flat shading)
-    if (s.tiltOpacity > 0) {
-      const tiltOpacRange = (s.tiltOpacity / 100) * 0.8;
-      this.injectInputCurve(
-        BRUSH.OPAQUE_MULTIPLY,
-        INPUT.TILT_DECLINATION,
-        0.0,
-        0.0, // upright: normal opacity
-        90.0,
-        -tiltOpacRange, // flat: reduced opacity
-      );
-    } else {
-      this.clearInputCurve(BRUSH.OPAQUE_MULTIPLY, INPUT.TILT_DECLINATION);
-    }
+    this.scaleOrInjectInputCurve(
+      BRUSH.OPAQUE_MULTIPLY,
+      INPUT.TILT_DECLINATION,
+      s.tiltOpacity,
+      0.0,
+      0.0,
+      90.0,
+      -0.8,
+      BRUSH.OPAQUE,
+    );
 
     // Tilt → Gradation: tilt softens the dab edge (reduces hardness)
-    if (s.tiltGradation > 0) {
-      const gradRange = (s.tiltGradation / 100) * 0.6;
-      this.injectInputCurve(
-        BRUSH.HARDNESS,
-        INPUT.TILT_DECLINATION,
-        0.0,
-        0.0, // upright: normal hardness
-        90.0,
-        -gradRange, // flat: softer edge
-      );
-    } else {
-      this.clearInputCurve(BRUSH.HARDNESS, INPUT.TILT_DECLINATION);
-    }
+    this.scaleOrInjectInputCurve(
+      BRUSH.HARDNESS,
+      INPUT.TILT_DECLINATION,
+      s.tiltGradation,
+      0.0,
+      0.0,
+      90.0,
+      -0.6,
+    );
 
     // Tilt → Bleed: tilt increases smudge
-    if (s.tiltBleed > 0) {
-      const tiltSmudge = (s.tiltBleed / 100) * 0.6;
-      this.injectInputCurve(
-        BRUSH.SMUDGE,
-        INPUT.TILT_DECLINATION,
-        0.0,
-        0.0, // upright: no smudge
-        90.0,
-        tiltSmudge, // flat: more smudge
-      );
-    } else {
-      this.clearInputCurve(BRUSH.SMUDGE, INPUT.TILT_DECLINATION);
-    }
+    this.scaleOrInjectInputCurve(
+      BRUSH.SMUDGE,
+      INPUT.TILT_DECLINATION,
+      s.tiltBleed,
+      0.0,
+      0.0,
+      90.0,
+      0.6,
+    );
 
     // Tilt → Size: dynamic size change based on actual tilt input
-    if (s.tiltSize > 0) {
-      const tiltSizeRange = (s.tiltSize / 100) * 1.5;
-      if (s.tiltSizeCompression) {
-        // Compression: more tilt = wider (flatter pencil tip covers more)
-        this.injectInputCurve(
-          BRUSH.RADIUS_LOGARITHMIC,
-          INPUT.TILT_DECLINATION,
-          0.0,
-          0.0,
-          90.0,
-          tiltSizeRange,
-        );
-      } else {
-        // Non-compression: more tilt = thinner
-        this.injectInputCurve(
-          BRUSH.RADIUS_LOGARITHMIC,
-          INPUT.TILT_DECLINATION,
-          0.0,
-          0.0,
-          90.0,
-          -tiltSizeRange,
-        );
-      }
+    if (s.tiltSizeCompression) {
+      this.scaleOrInjectInputCurve(
+        BRUSH.RADIUS_LOGARITHMIC,
+        INPUT.TILT_DECLINATION,
+        s.tiltSize,
+        0.0,
+        0.0,
+        90.0,
+        1.5,
+      );
     } else {
-      this.clearInputCurve(BRUSH.RADIUS_LOGARITHMIC, INPUT.TILT_DECLINATION);
+      this.scaleOrInjectInputCurve(
+        BRUSH.RADIUS_LOGARITHMIC,
+        INPUT.TILT_DECLINATION,
+        s.tiltSize,
+        0.0,
+        0.0,
+        90.0,
+        -1.5,
+      );
     }
 
     // ── PENCIL & STYLUS — BARREL ROLL ──────────────────────
-    // Barrel roll (twist) is threaded through as CUSTOM_INPUT
 
-    if (s.barrelRollSize > 0) {
-      const rollSizeRange = (s.barrelRollSize / 100) * 1.0;
-      this.injectInputCurve(
-        BRUSH.RADIUS_LOGARITHMIC,
-        INPUT.CUSTOM,
-        -1.0,
-        -rollSizeRange,
-        1.0,
-        rollSizeRange,
-      );
-    } else {
-      this.clearInputCurve(BRUSH.RADIUS_LOGARITHMIC, INPUT.CUSTOM);
-    }
+    this.scaleOrInjectInputCurve(
+      BRUSH.RADIUS_LOGARITHMIC,
+      INPUT.CUSTOM,
+      s.barrelRollSize,
+      -1.0,
+      -1.0,
+      1.0,
+      1.0,
+    );
 
-    if (s.barrelRollOpacity > 0) {
-      const rollOpacRange = (s.barrelRollOpacity / 100) * 0.6;
-      this.injectInputCurve(
-        BRUSH.OPAQUE_MULTIPLY,
-        INPUT.CUSTOM,
-        -1.0,
-        -rollOpacRange,
-        1.0,
-        0.0,
-      );
-    } else {
-      this.clearInputCurve(BRUSH.OPAQUE_MULTIPLY, INPUT.CUSTOM);
-    }
+    this.scaleOrInjectInputCurve(
+      BRUSH.OPAQUE_MULTIPLY,
+      INPUT.CUSTOM,
+      s.barrelRollOpacity,
+      -1.0,
+      -0.6,
+      1.0,
+      0.0,
+      BRUSH.OPAQUE,
+    );
 
-    if (s.barrelRollBleed > 0) {
-      const rollSmudge = (s.barrelRollBleed / 100) * 0.5;
-      this.injectInputCurve(
-        BRUSH.SMUDGE,
-        INPUT.CUSTOM,
-        -1.0,
-        0.0,
-        1.0,
-        rollSmudge,
-      );
-    } else {
-      this.clearInputCurve(BRUSH.SMUDGE, INPUT.CUSTOM);
-    }
+    this.scaleOrInjectInputCurve(
+      BRUSH.SMUDGE,
+      INPUT.CUSTOM,
+      s.barrelRollBleed,
+      -1.0,
+      0.0,
+      1.0,
+      0.5,
+    );
 
     // Barrel roll custom input slowness — how quickly twist changes take effect
     this.brush.settings[BRUSH.CUSTOM_INPUT_SLOWNESS].base_value = 1.0;
@@ -624,7 +1070,6 @@ export class BrushEngine {
 
   public endStroke() {
     if (!this.brush || !this.activeSettings) return;
-    this.brush.reset();
 
     if (this.canvasCtx) {
       // Final pixel-level post effects (alpha thresholding, specialized wet edges proxy)
@@ -748,7 +1193,11 @@ export class BrushEngine {
       }
 
       // taperLinkTips: mirror start taper to end when only start is set
-      if (this.activeSettings.taperLinkTips && taperStartDist > 0 && taperEndDist === 0) {
+      if (
+        this.activeSettings.taperLinkTips &&
+        taperStartDist > 0 &&
+        taperEndDist === 0
+      ) {
         if (finalPressure < 0.9) {
           const endFade = Math.max(0, finalPressure / 0.9);
           finalPressure *= endFade;

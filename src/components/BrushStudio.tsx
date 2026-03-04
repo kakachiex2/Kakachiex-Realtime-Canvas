@@ -34,17 +34,16 @@ const SIDEBAR_SECTIONS: SidebarEntry[] = [
   { id: "stroke",        label: "Stroke path",     icon: "〰",  enabled: true },
   { id: "stabilization", label: "Stabilization",   icon: "◎",  enabled: true },
   { id: "taper",         label: "Taper",           icon: "〜",  enabled: true },
-  { id: "shape",         label: "Shape",           icon: "✦",  enabled: false },
-  { id: "grain",         label: "Grain",           icon: "▦",  enabled: false },
+  { id: "shape",         label: "Shape",           icon: "✦",  enabled: true },
+  { id: "grain",         label: "Grain",           icon: "▦",  enabled: true },
   { id: "rendering",     label: "Rendering",       icon: "⟋",  enabled: true },
-  { id: "wetmix",        label: "Wet Mix",         icon: "💧",  enabled: false },
-  { id: "colordynamics", label: "Color dynamics",  icon: "✧",  enabled: false },
-  { id: "dynamics",      label: "Dynamics",        icon: "⌇",  enabled: false },
+  { id: "wetmix",        label: "Wet Mix",         icon: "💧",  enabled: true },
+  { id: "colordynamics", label: "Color dynamics",  icon: "✧",  enabled: true },
+  { id: "dynamics",      label: "Dynamics",        icon: "⌇",  enabled: true },
   { id: "applepencil",   label: "Pencil",          icon: "✎",  enabled: true },
-  { id: "properties",    label: "Properties",      icon: "☰",  enabled: false },
-  { id: "materials",     label: "Materials",       icon: "⊕",  enabled: false },
-  { id: "preview",       label: "Preview",         icon: "▢",  enabled: false },
-  { id: "about",         label: "About this brush",icon: "ⓘ",  enabled: false },
+  { id: "properties",    label: "Properties",      icon: "☰",  enabled: true },
+  { id: "preview",       label: "Preview",         icon: "▢",  enabled: true },
+  { id: "about",         label: "About this brush",icon: "ⓘ",  enabled: true },
 ];
 
 // ── Utility: Slider Row ────────────────────────────────────
@@ -73,21 +72,23 @@ function SliderRow({
   return (
     <div className="bs-slider-row">
       <span className="bs-slider-label">{label}</span>
-      <div className="bs-slider-track-wrap">
-        <input
-          type="range"
-          className="bs-slider"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          style={{
-            background: `linear-gradient(to right, #4df0ff ${pct}%, transparent ${pct}%)`,
-          }}
-        />
+      <div className="bs-slider-controls">
+        <div className="bs-slider-track-wrap">
+          <input
+            type="range"
+            className="bs-slider"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            style={{
+              background: `linear-gradient(to right, var(--bs-slider-fill, #4df0ff) ${pct}%, transparent ${pct}%)`,
+            }}
+          />
+        </div>
+        <span className="bs-value-badge">{displayVal}</span>
       </div>
-      <span className="bs-value-badge">{displayVal}</span>
     </div>
   );
 }
@@ -248,6 +249,8 @@ function getSplinePath(curve: {x:number, y:number}[]): string {
 function PressureCurveWidget({ value, onChange }: { value: { x: number; y: number }[]; onChange: (v: { x: number; y: number }[]) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const lastClickTime = useRef(0);
+  const lastClickIdx = useRef(-1);
 
   const getPt = (clientX: number, clientY: number) => {
     if (!containerRef.current) return { x: 0, y: 0 };
@@ -276,6 +279,21 @@ function PressureCurveWidget({ value, onChange }: { value: { x: number; y: numbe
         closestIdx = i;
       }
     });
+
+    // Double-click detection: delete intermediate dots
+    const now = Date.now();
+    if (closestIdx !== -1 && closestIdx === lastClickIdx.current && now - lastClickTime.current < 300) {
+      // Double-click on same dot — remove it if not first or last
+      if (closestIdx > 0 && closestIdx < value.length - 1) {
+        const newPts = value.filter((_, i) => i !== closestIdx);
+        onChange(newPts);
+        lastClickTime.current = 0;
+        lastClickIdx.current = -1;
+        return;
+      }
+    }
+    lastClickTime.current = now;
+    lastClickIdx.current = closestIdx;
 
     if (closestIdx !== -1) {
       setDragIndex(closestIdx);
@@ -311,36 +329,54 @@ function PressureCurveWidget({ value, onChange }: { value: { x: number; y: numbe
     setDragIndex(null);
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
+
+  const handleReset = () => {
+    onChange([{ x: 0, y: 0 }, { x: 1, y: 1 }]);
+  };
   
   const pathData = getSplinePath(value);
 
   return (
-    <div 
-      ref={containerRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      style={{ position: 'relative', width: 270, height: 270, background: 'rgba(0,0,0,0.01)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 24px 0', cursor: 'crosshair', touchAction: 'none' }}
-    >
-       {/* Grid Lines */}
-       <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
-            {/* Vertical */}
-            <line x1="25" y1="0" x2="25" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-            <line x1="50" y1="0" x2="50" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-            <line x1="75" y1="0" x2="75" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-            {/* Horizontal */}
-            <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-            <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-            <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-            
-            {/* Curve Path */}
-            <path d={pathData} stroke="#444" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
-            
-            {/* Points */}
-            {value.map((p, i) => (
-               <circle key={i} cx={p.x * 100} cy={(1 - p.y) * 100} r={2.5} fill="#444" stroke="transparent" />
-            ))}
-         </svg>
+    <div>
+      <div 
+        ref={containerRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        style={{ position: 'relative', width: 270, height: 270, background: 'rgba(0,0,0,0.01)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 8px 0', cursor: 'crosshair', touchAction: 'none' }}
+      >
+         {/* Grid Lines */}
+         <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
+              {/* Vertical */}
+              <line x1="25" y1="0" x2="25" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+              <line x1="50" y1="0" x2="50" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+              <line x1="75" y1="0" x2="75" y2="100" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+              {/* Horizontal */}
+              <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+              <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+              <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+              
+              {/* Curve Path */}
+              <path d={pathData} stroke="#444" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
+              
+              {/* Points - intermediate dots are slightly larger to hint they're removable */}
+              {value.map((p, i) => (
+                 <circle key={i} cx={p.x * 100} cy={(1 - p.y) * 100} r={i === 0 || i === value.length - 1 ? 2.5 : 3.5} fill={i === 0 || i === value.length - 1 ? "#444" : "#2979ff"} stroke="transparent" />
+              ))}
+           </svg>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <span style={{ fontSize: 11, color: 'var(--bs-text-muted)', fontStyle: 'italic' }}>
+          {value.length > 2 ? 'Double-click dot to remove' : ''}
+        </span>
+        <button
+          className="bs-grain-edit-btn"
+          onClick={handleReset}
+          type="button"
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
@@ -418,9 +454,152 @@ function TiltWidget({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
+// ── Utility: Circular Angle Widget ─────────────────────────────
+function CircularAngleWidget({
+  rotation,
+  roundness,
+  onRotationChange,
+  onRoundnessChange,
+}: {
+  rotation: number;
+  roundness: number;
+  onRotationChange: (v: number) => void;
+  onRoundnessChange: (v: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [activeDrag, setActiveDrag] = useState<"rotation" | "roundness" | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent, type: "rotation" | "roundness") => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setActiveDrag(type);
+    updateValues(e, type);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (activeDrag) {
+      updateValues(e, activeDrag);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setActiveDrag(null);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  const updateValues = (e: React.PointerEvent, type: "rotation" | "roundness") => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+
+    if (type === "rotation") {
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      if (angle < 0) angle += 360;
+      onRotationChange(angle);
+    } else if (type === "roundness") {
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxDist = rect.width / 2;
+      let r = (dist / maxDist) * 100;
+      r = Math.max(0, Math.min(100, r));
+      onRoundnessChange(r);
+    }
+  };
+
+  const angleRad = (rotation * Math.PI) / 180;
+  const rotX = 50 + Math.cos(angleRad) * 40;
+  const rotY = 50 + Math.sin(angleRad) * 40;
+  const rotOppX = 50 + Math.cos(angleRad + Math.PI) * 40;
+  const rotOppY = 50 + Math.sin(angleRad + Math.PI) * 40;
+
+  const roundRadius = Math.max(0, Math.min(40, (roundness / 100) * 40));
+  const perpRad1 = angleRad + Math.PI / 2;
+  const perpRad2 = angleRad - Math.PI / 2;
+  const r1X = 50 + Math.cos(perpRad1) * roundRadius;
+  const r1Y = 50 + Math.sin(perpRad1) * roundRadius;
+  const r2X = 50 + Math.cos(perpRad2) * roundRadius;
+  const r2Y = 50 + Math.sin(perpRad2) * roundRadius;
+
+  return (
+    <div
+      ref={containerRef}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      style={{
+        position: 'relative', width: 270, height: 270, background: 'rgba(0,0,0,0.01)',
+        border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px', margin: '8px 0 24px 0',
+        touchAction: 'none'
+      }}
+    >
+      <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ pointerEvents: 'none' }}>
+        <line x1="50" y1="0" x2="50" y2="100" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" strokeDasharray="2,2" fill="none" />
+        
+        <ellipse
+          cx="50" cy="50" rx="40" ry={roundRadius} fill="none"
+          stroke="rgba(255,255,255,0.6)" strokeWidth="1"
+          transform={`rotate(${rotation} 50 50)`}
+        />
+
+        {/* Rotation Dots (Green) */}
+        <circle cx={rotX} cy={rotY} r="3" fill="#34c759" stroke="#fff" strokeWidth="1" style={{ pointerEvents: 'auto', cursor: 'grab' }} onPointerDown={(e) => handlePointerDown(e, "rotation")} />
+        <circle cx={rotOppX} cy={rotOppY} r="3" fill="#34c759" stroke="#fff" strokeWidth="1" style={{ pointerEvents: 'auto', cursor: 'grab' }} onPointerDown={(e) => handlePointerDown(e, "rotation")} />
+
+        {/* Roundness Dots (Blue) */}
+        <circle cx={r1X} cy={r1Y} r="3" fill="#007aff" stroke="#fff" strokeWidth="1" style={{ pointerEvents: 'auto', cursor: 'grab' }} onPointerDown={(e) => handlePointerDown(e, "roundness")} />
+        <circle cx={r2X} cy={r2Y} r="3" fill="#007aff" stroke="#fff" strokeWidth="1" style={{ pointerEvents: 'auto', cursor: 'grab' }} onPointerDown={(e) => handlePointerDown(e, "roundness")} />
+      </svg>
+      <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none' }}>
+        {Math.round(rotation)}°
+      </div>
+    </div>
+  );
+}
+
+// ── Utility: Grain Preview Canvas ──────────────────────────
+function GrainPreview({ zoom, brightness, contrast }: { zoom: number; brightness: number; contrast: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = 120;
+    canvas.height = 120;
+
+    const scale = Math.max(1, zoom / 50);
+    const imgData = ctx.createImageData(120, 120);
+    const data = imgData.data;
+    const brightnessOffset = (brightness / 100) * 128;
+    const contrastFactor = 1 + (contrast / 100);
+
+    for (let y = 0; y < 120; y++) {
+      for (let x = 0; x < 120; x++) {
+        const sx = Math.floor(x / scale) * 1337;
+        const sy = Math.floor(y / scale) * 7919;
+        // Simple hash noise
+        let noise = ((sx ^ sy) * 2654435761 >>> 0) % 256;
+        // Apply brightness and contrast
+        noise = Math.max(0, Math.min(255, (noise - 128) * contrastFactor + 128 + brightnessOffset));
+        const i = (y * 120 + x) * 4;
+        data[i] = data[i + 1] = data[i + 2] = noise;
+        data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }, [zoom, brightness, contrast]);
+
+  return <canvas ref={canvasRef} width={120} height={120} />;
+}
+
 
 // ── Main Component ─────────────────────────────────────────
-interface BrushStudioProps {
+export interface BrushStudioProps {
   isOpen: boolean;
   brushName: string;
   settings: BrushStudioSettings;
@@ -432,6 +611,9 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
   const [activeSection, setActiveSection] = useState<SectionId>("stroke");
   const [localSettings, setLocalSettings] = useState<BrushStudioSettings>(settings);
   const [wasOpen, setWasOpen] = useState(false);
+
+  // Editor Drawer State
+  const [isEditorOpen, setIsEditorOpen] = useState<"shape" | "grain" | null>(null);
 
   // Drawing pad refs
   const padCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -581,6 +763,47 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
 
   if (!isOpen) return null;
 
+  // If the editor is open, render over the top
+  if (isEditorOpen) {
+    const isShape = isEditorOpen === 'shape';
+    return (
+      <div className="brush-studio-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+        <div className="brush-studio-container" style={{ display: 'flex', flexDirection: 'column', background: '#1c1c1e' }}>
+            {/* Header */}
+            <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <h2 style={{ color: '#fff', fontSize: 28, margin: 0, fontWeight: 600 }}>
+                 {isShape ? 'Shape Editor' : 'Grain Editor'}
+               </h2>
+               <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                 <button style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }} onClick={() => {}}>Import</button>
+                 <button style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }} onClick={() => setIsEditorOpen(null)}>Cancel</button>
+                 <button className="bs-top-btn done" onClick={() => setIsEditorOpen(null)}>Done</button>
+               </div>
+            </div>
+            
+            {/* Editor Content */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 500, height: 500, background: '#151515', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid #333' }}>
+                    {isShape ? (
+                        <>
+                           <div style={{ width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, transparent 70%)', opacity: 0.8, marginBottom: 40 }} />
+                           <span style={{ color: '#aaa', fontSize: 16, fontWeight: 500, letterSpacing: 1.5 }}>ALGORITHMIC DAB</span>
+                           <p style={{ color: '#555', fontSize: 13, textAlign: 'center', marginTop: 12, maxWidth: 300, lineHeight: 1.5 }}>MyPaint engine generates shapes mathematically instead of stamping images.</p>
+                        </>
+                    ) : (
+                        <>
+                           <div style={{ width: 200, height: 200, background: 'repeating-linear-gradient(45deg, #333 0, #333 2px, transparent 2px, transparent 8px), repeating-linear-gradient(-45deg, #333 0, #333 2px, transparent 2px, transparent 8px)', opacity: 0.5, marginBottom: 40, borderRadius: 16 }} />
+                           <span style={{ color: '#aaa', fontSize: 16, fontWeight: 500, letterSpacing: 1.5 }}>PROCEDURAL GRAIN</span>
+                           <p style={{ color: '#555', fontSize: 13, textAlign: 'center', marginTop: 12, maxWidth: 300, lineHeight: 1.5 }}>Texture is generated procedurally using noise and scattering.</p>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Render Section Content ─────────────────────────────
   const renderStroke = () => (
     <>
@@ -590,6 +813,11 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
       <SliderRow label="Jitter Lateral" value={localSettings.jitterLateral} onChange={(v) => updateSetting("jitterLateral", v)} />
       <SliderRow label="Jitter Linear" value={localSettings.jitterLinear} onChange={(v) => updateSetting("jitterLinear", v)} />
       <SliderRow label="Fall off" value={localSettings.fallOff} onChange={(v) => updateSetting("fallOff", v)} />
+
+      <div className="bs-group-title">Native Behavior</div>
+      <div className="bs-slider-mypaint"><SliderRow label="Dabs per second" value={localSettings.dabsPerSecond} onChange={(v) => updateSetting("dabsPerSecond", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Stroke threshold" value={localSettings.strokeThreshold} onChange={(v) => updateSetting("strokeThreshold", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Stroke holdtime" value={localSettings.strokeHoldtime} onChange={(v) => updateSetting("strokeHoldtime", v)} /></div>
     </>
   );
 
@@ -605,6 +833,10 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
       <div className="bs-group-title">Motion filtering</div>
       <SliderRow label="Amount" value={localSettings.motionFilterAmount} onChange={(v) => updateSetting("motionFilterAmount", v)} />
       <SliderRow label="Expression" value={localSettings.motionFilterExpression} onChange={(v) => updateSetting("motionFilterExpression", v)} />
+      
+      <div className="bs-group-title">Native Engine Tracking</div>
+      <div className="bs-slider-mypaint"><SliderRow label="Slow tracking" value={localSettings.slowTracking} onChange={(v) => updateSetting("slowTracking", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Slow tracking per dab" value={localSettings.slowTrackingPerDab} onChange={(v) => updateSetting("slowTrackingPerDab", v)} /></div>
     </>
   );
 
@@ -675,6 +907,272 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
     </>
   );
 
+  const renderGrain = () => {
+    const isMoving = localSettings.grainBehavior === "Moving";
+    return (
+      <>
+        {/* Grain Source */}
+        <div className="bs-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Grain Source
+          <button className="bs-grain-edit-btn" onClick={() => setIsEditorOpen('grain')}>Edit</button>
+        </div>
+        <div className="bs-grain-preview" style={{ marginBottom: 20, width: '100%', height: 200, borderRadius: 12, overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <GrainPreview
+            zoom={isMoving ? localSettings.grainMovingZoom : localSettings.grainTexZoom}
+            brightness={localSettings.grainBrightness}
+            contrast={localSettings.grainContrast}
+          />
+        </div>
+
+        {/* Grain behavior toggle */}
+        <div className="bs-subsection-title">Grain behavior</div>
+        <div className="bs-segment-control">
+          <button
+            className={`bs-segment-btn ${isMoving ? "active" : ""}`}
+            onClick={() => updateSetting("grainBehavior", "Moving")}
+            type="button"
+          >
+            <span className="bs-segment-icon">☁</span> Moving
+          </button>
+          <button
+            className={`bs-segment-btn ${!isMoving ? "active" : ""}`}
+            onClick={() => updateSetting("grainBehavior", "Texturized")}
+            type="button"
+          >
+            <span className="bs-segment-icon">▦</span> Texturized
+          </button>
+        </div>
+
+        {/* Moving grain settings */}
+        {isMoving && (
+          <>
+            <SelectRow
+              label="Movement"
+              value={localSettings.grainMovement}
+              options={["Rolling", "Flowing", "Glazed", "Luminescent"]}
+              onChange={(v) => updateSetting("grainMovement", v)}
+            />
+            <SliderRow label="Scale" value={localSettings.grainMovingScale} onChange={(v) => updateSetting("grainMovingScale", v)} />
+            <SliderRow label="Zoom" value={localSettings.grainMovingZoom} min={1} max={200} suffix="%" onChange={(v) => updateSetting("grainMovingZoom", v)} />
+            <SliderRow label="Rotation" value={localSettings.grainMovingRotation} max={360} suffix="°" onChange={(v) => updateSetting("grainMovingRotation", v)} />
+            <SliderRow label="Depth" value={localSettings.grainMovingDepth} suffix="%" onChange={(v) => updateSetting("grainMovingDepth", v)} />
+            <SliderRow label="Depth minimum" value={localSettings.grainMovingDepthMin} onChange={(v) => updateSetting("grainMovingDepthMin", v)} />
+            <SliderRow label="Depth jitter" value={localSettings.grainMovingDepthJitter} onChange={(v) => updateSetting("grainMovingDepthJitter", v)} />
+          </>
+        )}
+
+        {/* Texturized grain settings */}
+        {!isMoving && (
+          <>
+            <SliderRow label="Scale" value={localSettings.grainTexScale} onChange={(v) => updateSetting("grainTexScale", v)} />
+            <SliderRow label="Zoom" value={localSettings.grainTexZoom} min={1} max={200} suffix="%" onChange={(v) => updateSetting("grainTexZoom", v)} />
+            <SliderRow label="Rotation" value={localSettings.grainTexRotation} max={360} suffix="°" onChange={(v) => updateSetting("grainTexRotation", v)} />
+            <SliderRow label="Depth" value={localSettings.grainTexDepth} suffix="%" onChange={(v) => updateSetting("grainTexDepth", v)} />
+            <SliderRow label="Depth minimum" value={localSettings.grainTexDepthMin} onChange={(v) => updateSetting("grainTexDepthMin", v)} />
+            <SliderRow label="Depth jitter" value={localSettings.grainTexDepthJitter} onChange={(v) => updateSetting("grainTexDepthJitter", v)} />
+          </>
+        )}
+
+        {/* Common settings */}
+        <div style={{ marginTop: 8 }}>
+          <ToggleRow label="Offset jitter" value={localSettings.grainOffsetJitter} onChange={(v) => updateSetting("grainOffsetJitter", v)} />
+          <SelectRow
+            label="Blend mode"
+            value={localSettings.grainBlendMode}
+            options={["Multiply", "Screen", "Overlay", "Darken", "Lighten", "Color Dodge", "Color Burn"]}
+            onChange={(v) => updateSetting("grainBlendMode", v)}
+          />
+          <SliderRow label="Brightness" value={localSettings.grainBrightness} min={-100} max={100} suffix="%" onChange={(v) => updateSetting("grainBrightness", v)} />
+          <SliderRow label="Contrast" value={localSettings.grainContrast} min={-100} max={100} suffix="%" onChange={(v) => updateSetting("grainContrast", v)} />
+        </div>
+
+        {/* Grain filtering */}
+        <div className="bs-subsection-title">Grain filtering</div>
+        <div className="bs-radio-group">
+          {["None", "Classic", "Improved"].map((mode) => (
+            <button
+              key={mode}
+              className={`bs-radio-item ${localSettings.grainFiltering === mode ? "active" : ""}`}
+              onClick={() => updateSetting("grainFiltering", mode)}
+              type="button"
+            >
+              {mode === "None" ? "No filtering" : `${mode} filtering`}
+              {localSettings.grainFiltering === mode && <span className="bs-radio-check">✓</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* 3D grain behaviour */}
+        <div className="bs-subsection-title">3D grain behaviour</div>
+        <ToggleRow label="Grain follows camera" value={localSettings.grainFollowsCamera} onChange={(v) => updateSetting("grainFollowsCamera", v)} />
+      </>
+    );
+  };
+
+  const renderShape = () => {
+    return (
+    <>
+      {/* Shape Source */}
+      <div className="bs-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        Shape Source
+        <button className="bs-grain-edit-btn" onClick={() => setIsEditorOpen('shape')}>Edit</button>
+      </div>
+      <div style={{ background: '#111', width: '100%', height: 200, borderRadius: 12, margin: '8px 0 24px 0', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+         <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, transparent 70%)', opacity: 0.8, marginBottom: 12 }} />
+         <span style={{ color: '#888', fontSize: 13, fontWeight: 500, letterSpacing: 0.5 }}>ALGORITHMIC DAB</span>
+      </div>
+
+      <div className="bs-subsection-title">Input style</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
+         {["Touch only", "Azimuth", "Azimuth and barrel roll"].map(mode => (
+             <button
+                key={mode}
+                onClick={() => updateSetting("shapeInputStyle", mode)}
+                className={`bs-rendering-btn ${localSettings.shapeInputStyle === mode ? 'active' : ''}`}
+             >
+                {mode}
+                {localSettings.shapeInputStyle === mode && <span>✓</span>}
+             </button>
+         ))}
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <ToggleRow label="Relative to stroke" value={localSettings.shapeRelativeToStroke} onChange={(v) => updateSetting("shapeRelativeToStroke", v)} />
+      </div>
+
+      <div className="bs-subsection-title">Touch properties</div>
+      <div style={{ opacity: 0.5, pointerEvents: 'none', marginBottom: 24 }}>
+        <SliderRow label="Rotation" value={localSettings.shapeTouchRotation} suffix="%" onChange={(v) => updateSetting("shapeTouchRotation", v)} />
+      </div>
+
+      <div className="bs-subsection-title">Shape behavior</div>
+      <div className="bs-slider-mypaint"><SliderRow label="Hardness" value={localSettings.shapeHardness} onChange={(v) => updateSetting("shapeHardness", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Direction filter" value={localSettings.directionFilter} onChange={(v) => updateSetting("directionFilter", v)} /></div>
+      <SliderRow label="Scatter" value={localSettings.shapeScatter} onChange={(v) => updateSetting("shapeScatter", v)} />
+      <SliderRow label="Count" value={localSettings.shapeCount} min={1} max={16} suffix="" onChange={(v) => updateSetting("shapeCount", v)} />
+      <SliderRow label="Count jitter" value={localSettings.shapeCountJitter} onChange={(v) => updateSetting("shapeCountJitter", v)} />
+      
+      <div style={{ marginTop: 8, marginBottom: 16 }}>
+        <ToggleRow label="Randomized" value={localSettings.shapeRandomized} onChange={(v) => updateSetting("shapeRandomized", v)} />
+        <ToggleRow label="Flip X" value={localSettings.shapeFlipX} onChange={(v) => updateSetting("shapeFlipX", v)} />
+        <ToggleRow label="Flip Y" value={localSettings.shapeFlipY} onChange={(v) => updateSetting("shapeFlipY", v)} />
+      </div>
+
+      <CircularAngleWidget
+        rotation={localSettings.shapeRotation}
+        roundness={localSettings.shapeRoundness}
+        onRotationChange={(v) => updateSetting("shapeRotation", v)}
+        onRoundnessChange={(v) => updateSetting("shapeRoundness", v)}
+      />
+
+      <SliderRow label="Pressure Roundness" value={localSettings.shapePressureRoundness} onChange={(v) => updateSetting("shapePressureRoundness", v)} />
+      <SliderRow label="Tilt roundness" value={localSettings.shapeTiltRoundness} onChange={(v) => updateSetting("shapeTiltRoundness", v)} />
+      <SliderRow label="Roundness Vertical Jitter" value={localSettings.shapeRoundnessVerticalJitter} onChange={(v) => updateSetting("shapeRoundnessVerticalJitter", v)} />
+      <SliderRow label="Roundness Horizontal Jitter" value={localSettings.shapeRoundnessHorizontalJitter} onChange={(v) => updateSetting("shapeRoundnessHorizontalJitter", v)} />
+
+      {/* Shape filtering */}
+      <div className="bs-subsection-title">Shape filtering</div>
+      <div className="bs-radio-group">
+        {["None", "Classic", "Improved"].map((mode) => (
+          <button
+            key={mode}
+            className={`bs-radio-item ${localSettings.shapeFiltering === mode ? "active" : ""}`}
+            onClick={() => updateSetting("shapeFiltering", mode)}
+            type="button"
+          >
+            {mode === "None" ? "No filtering" : `${mode} filtering`}
+            {localSettings.shapeFiltering === mode && <span className="bs-radio-check">✓</span>}
+          </button>
+        ))}
+      </div>
+    </>
+    );
+  };
+
+  const renderProperties = () => (
+    <>
+      <div className="bs-section-title">Brush properties</div>
+      <ToggleRow label="Orient to screen" value={localSettings.orientToScreen} onChange={(v) => updateSetting("orientToScreen", v)} />
+      <SliderRow label="Smudge Pull" value={localSettings.smudgePull} onChange={(v) => updateSetting("smudgePull", v)} />
+
+      <div className="bs-group-title">Brush behavior</div>
+      <SliderRow label="Maximum size" value={localSettings.maxSize} suffix={localSettings.maxSize >= 100 ? " Max" : "%"} onChange={(v) => updateSetting("maxSize", v)} />
+      <SliderRow label="Minimum size" value={localSettings.minSize} onChange={(v) => updateSetting("minSize", v)} />
+      <SliderRow label="Maximum opacity" value={localSettings.maxOpacity} suffix="%" onChange={(v) => updateSetting("maxOpacity", v)} />
+      <SliderRow label="Minimum opacity" value={localSettings.minOpacity} onChange={(v) => updateSetting("minOpacity", v)} />
+      <div className="bs-slider-mypaint"><SliderRow label="Opacity multiply" value={localSettings.opacityMultiply} onChange={(v) => updateSetting("opacityMultiply", v)} /></div>
+    </>
+  );
+
+  const renderWetMix = () => (
+    <>
+      <div className="bs-section-title">Wet mix</div>
+      <SliderRow label="Dilution" value={localSettings.wetMixDilution} onChange={(v) => updateSetting("wetMixDilution", v)} />
+      <SliderRow label="Charge" value={localSettings.wetMixCharge} onChange={(v) => updateSetting("wetMixCharge", v)} />
+      <SliderRow label="Attack" value={localSettings.wetMixAttack} onChange={(v) => updateSetting("wetMixAttack", v)} />
+      <SliderRow label="Pull" value={localSettings.wetMixPull} onChange={(v) => updateSetting("wetMixPull", v)} />
+      <SliderRow label="Grade" value={localSettings.wetMixGrade} onChange={(v) => updateSetting("wetMixGrade", v)} />
+      <SliderRow label="Blur" value={localSettings.wetMixBlur} onChange={(v) => updateSetting("wetMixBlur", v)} />
+      <SliderRow label="Blur jitter" value={localSettings.wetMixBlurJitter} onChange={(v) => updateSetting("wetMixBlurJitter", v)} />
+      <SliderRow label="Wetness jitter" value={localSettings.wetMixWetnessJitter} onChange={(v) => updateSetting("wetMixWetnessJitter", v)} />
+    </>
+  );
+
+  const renderColorDynamics = () => (
+    <>
+      <div className="bs-section-title">Stamp color jitter</div>
+      <SliderRow label="Hue" value={localSettings.colorStampHue} onChange={(v) => updateSetting("colorStampHue", v)} />
+      <SliderRow label="Saturation" value={localSettings.colorStampSaturation} onChange={(v) => updateSetting("colorStampSaturation", v)} />
+      <SliderRow label="Lightness" value={localSettings.colorStampLightness} onChange={(v) => updateSetting("colorStampLightness", v)} />
+      <SliderRow label="Darkness" value={localSettings.colorStampDarkness} onChange={(v) => updateSetting("colorStampDarkness", v)} />
+      <SliderRow label="Secondary color" value={localSettings.colorStampSecondary} onChange={(v) => updateSetting("colorStampSecondary", v)} />
+
+      <div className="bs-group-title">Stroke color jitter</div>
+      <SliderRow label="Hue" value={localSettings.colorStrokeHue} onChange={(v) => updateSetting("colorStrokeHue", v)} />
+      <SliderRow label="Saturation" value={localSettings.colorStrokeSaturation} onChange={(v) => updateSetting("colorStrokeSaturation", v)} />
+      <SliderRow label="Lightness" value={localSettings.colorStrokeLightness} onChange={(v) => updateSetting("colorStrokeLightness", v)} />
+      <SliderRow label="Darkness" value={localSettings.colorStrokeDarkness} onChange={(v) => updateSetting("colorStrokeDarkness", v)} />
+      <SliderRow label="Secondary color" value={localSettings.colorStrokeSecondary} onChange={(v) => updateSetting("colorStrokeSecondary", v)} />
+
+      <div className="bs-group-title">Color pressure</div>
+      <SliderRow label="Hue" value={localSettings.colorPressureHue} onChange={(v) => updateSetting("colorPressureHue", v)} />
+      <SliderRow label="Saturation" value={localSettings.colorPressureSaturation} onChange={(v) => updateSetting("colorPressureSaturation", v)} />
+      <SliderRow label="Brightness" value={localSettings.colorPressureBrightness} onChange={(v) => updateSetting("colorPressureBrightness", v)} />
+      <SliderRow label="Secondary Color" value={localSettings.colorPressureSecondary} onChange={(v) => updateSetting("colorPressureSecondary", v)} />
+
+      <div className="bs-group-title">Color tilt</div>
+      <SliderRow label="Hue" value={localSettings.colorTiltHue} onChange={(v) => updateSetting("colorTiltHue", v)} />
+      <SliderRow label="Saturation" value={localSettings.colorTiltSaturation} onChange={(v) => updateSetting("colorTiltSaturation", v)} />
+      <SliderRow label="Brightness" value={localSettings.colorTiltBrightness} onChange={(v) => updateSetting("colorTiltBrightness", v)} />
+      <SliderRow label="Secondary Color" value={localSettings.colorTiltSecondary} onChange={(v) => updateSetting("colorTiltSecondary", v)} />
+
+      <div className="bs-group-title">Color barrel roll</div>
+      <SliderRow label="Hue" value={localSettings.colorBarrelHue} onChange={(v) => updateSetting("colorBarrelHue", v)} />
+      <SliderRow label="Saturation" value={localSettings.colorBarrelSaturation} onChange={(v) => updateSetting("colorBarrelSaturation", v)} />
+      <SliderRow label="Brightness" value={localSettings.colorBarrelBrightness} onChange={(v) => updateSetting("colorBarrelBrightness", v)} />
+      <SliderRow label="Secondary Color" value={localSettings.colorBarrelSecondary} onChange={(v) => updateSetting("colorBarrelSecondary", v)} />
+    </>
+  );
+
+  const renderDynamics = () => (
+    <>
+      <div className="bs-section-title">Speed</div>
+      <SliderRow label="Size" value={localSettings.dynamicsSpeedSize} onChange={(v) => updateSetting("dynamicsSpeedSize", v)} />
+      <SliderRow label="Opacity" value={localSettings.dynamicsSpeedOpacity} onChange={(v) => updateSetting("dynamicsSpeedOpacity", v)} />
+      <SliderRow label="Spacing" value={localSettings.dynamicsSpeedSpacing} onChange={(v) => updateSetting("dynamicsSpeedSpacing", v)} />
+      
+      <div className="bs-group-title">Smoothing</div>
+      <div className="bs-slider-mypaint"><SliderRow label="Speed1 slowness" value={localSettings.speed1Slowness} onChange={(v) => updateSetting("speed1Slowness", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Speed2 slowness" value={localSettings.speed2Slowness} onChange={(v) => updateSetting("speed2Slowness", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Speed1 gamma" value={localSettings.speed1Gamma} onChange={(v) => updateSetting("speed1Gamma", v)} /></div>
+      <div className="bs-slider-mypaint"><SliderRow label="Speed2 gamma" value={localSettings.speed2Gamma} onChange={(v) => updateSetting("speed2Gamma", v)} /></div>
+
+      <div className="bs-group-title">Jitter</div>
+      <div className="bs-slider-mypaint"><SliderRow label="Offset by speed slowness" value={localSettings.offsetBySpeedSlowness} onChange={(v) => updateSetting("offsetBySpeedSlowness", v)} /></div>
+      <SliderRow label="Size" value={localSettings.dynamicsJitterSize} onChange={(v) => updateSetting("dynamicsJitterSize", v)} />
+      <SliderRow label="Opacity" value={localSettings.dynamicsJitterOpacity} onChange={(v) => updateSetting("dynamicsJitterOpacity", v)} />
+    </>
+  );
+
   const renderApplePencil = () => (
     <>
       <div className="bs-section-title">Pressure</div>
@@ -729,6 +1227,59 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
     </>
   );
 
+  const renderPreview = () => {
+    const currentPreset = BrushEngine.presets.find((p) => p.name === brushName);
+    return (
+    <>
+      <div className="bs-section-title">Preview render</div>
+      <div style={{ background: '#222', borderRadius: 12, padding: 16, border: '1px solid #333', marginBottom: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, overflow: 'hidden' }}>
+         <span style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{brushName}</span>
+         {currentPreset?.preview && (
+            <img src={currentPreset.preview} alt="Brush Stroke Preview" style={{ width: '100%', height: 80, objectFit: 'contain', filter: 'invert(1) grayscale(1)' }} />
+         )}
+      </div>
+
+      <div className="bs-section-title">Preview properties</div>
+      <ToggleRow label="Use stamp preview" value={localSettings.previewUseStamp} onChange={(v) => updateSetting("previewUseStamp", v)} />
+      <SliderRow label="Size" value={localSettings.previewSize} onChange={(v) => updateSetting("previewSize", v)} />
+      <SliderRow label="Pressure Minimum" value={localSettings.previewPressureMin} onChange={(v) => updateSetting("previewPressureMin", v)} />
+      <SliderRow label="Pressure Scale" value={localSettings.previewPressureScale} onChange={(v) => updateSetting("previewPressureScale", v)} />
+      <ToggleRow label="Wet Mix" value={localSettings.previewWetMix} onChange={(v) => updateSetting("previewWetMix", v)} />
+      <SliderRow label="Tilt angle" value={localSettings.previewTiltAngle} onChange={(v) => updateSetting("previewTiltAngle", v)} />
+    </>
+    );
+  };
+
+  const renderAbout = () => (
+    <>
+      <div style={{ background: '#222', borderRadius: 12, padding: 32, border: '1px solid #333', marginBottom: 16, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+         <span style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 24, alignSelf: 'flex-start' }}>{brushName}</span>
+         
+         <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <span style={{ fontSize: 32 }}>👤</span>
+         </div>
+         
+         <span style={{ color: '#ccc', fontSize: 16, marginBottom: 4 }}>Made by <span style={{ color: '#fff', fontWeight: 600 }}>Name</span></span>
+         <span style={{ color: '#666', fontSize: 12, marginBottom: 40 }}>Created on {new Date().toLocaleDateString()}</span>
+         
+         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'end', borderBottom: '1px dashed #444', paddingBottom: 8 }}>
+            <span style={{ color: '#555', fontSize: 12 }}>Sign here</span>
+            <span style={{ color: '#555', fontSize: 16 }}>⊗</span>
+         </div>
+      </div>
+
+      <button style={{ width: '100%', background: '#222', color: '#ccc', border: '1px solid #333', borderRadius: 8, padding: '12px 16px', textAlign: 'left', fontSize: 14, marginBottom: 16, cursor: 'pointer' }}>
+        Create new reset point
+      </button>
+
+      <div className="bs-section-title">Reset brush</div>
+      <div style={{ background: '#222', borderRadius: 8, padding: '12px 16px', border: '1px solid #333', display: 'flex', alignItems: 'center', gap: 12 }}>
+         <input type="checkbox" checked={true} readOnly style={{ accentColor: '#2979ff', width: 16, height: 16 }} />
+         <span style={{ color: '#ccc', fontSize: 14 }}>Last reset point: {new Date().toLocaleDateString()}</span>
+      </div>
+    </>
+  );
+
   const renderSection = () => {
     switch (activeSection) {
       case "stroke":
@@ -739,8 +1290,24 @@ export function BrushStudio({ isOpen, brushName, settings, onDone, onCancel }: B
         return renderTaper();
       case "rendering":
         return renderRendering();
+      case "wetmix":
+        return renderWetMix();
+      case "grain":
+        return renderGrain();
+      case "shape":
+        return renderShape();
+      case "colordynamics":
+        return renderColorDynamics();
+      case "dynamics":
+        return renderDynamics();
       case "applepencil":
         return renderApplePencil();
+      case "properties":
+        return renderProperties();
+      case "preview":
+        return renderPreview();
+      case "about":
+        return renderAbout();
       default:
         return <div className="bs-coming-soon">Coming soon</div>;
     }

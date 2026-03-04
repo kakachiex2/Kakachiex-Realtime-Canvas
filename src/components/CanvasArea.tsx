@@ -11,15 +11,16 @@ export interface CanvasAreaHandles {
 
 interface CanvasAreaProps {
   onDraw: () => void;
-  color: string;
+  canvasColor: string;
+  brushColor: { r: number, g: number, b: number } | string; // Assuming string is fallback or App passes strictly object. Wait, App passes {r,g,b}.
   brushSize: number;
   activeBrush?: string;
-  opacity?: number;
+  brushOpacity?: number;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   studioSettings?: BrushStudioSettings;
 }
 
-export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDraw, color, brushSize, activeBrush, opacity, onHistoryChange, studioSettings }, ref) => {
+export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDraw, canvasColor, brushColor, brushSize, activeBrush, brushOpacity, onHistoryChange, studioSettings }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const brushEngineRef = useRef<BrushEngine | null>(null);
@@ -79,6 +80,11 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     clear: () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+          ctx.fillStyle = canvasColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       brushEngineRef.current?.clear();
       saveState();
     },
@@ -118,6 +124,7 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
     const canvas = canvasRef.current;
     if (!canvas) return;
     brushEngineRef.current = new BrushEngine(canvas);
+    (window as any).debugBrushEngine = brushEngineRef.current;
   }, []);
 
   useEffect(() => {
@@ -127,14 +134,18 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
   }, [activeBrush]);
 
   useEffect(() => {
-    if (brushEngineRef.current && color) {
-      const hex = color.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      brushEngineRef.current.setColor(r, g, b);
+    if (brushEngineRef.current && brushColor) {
+      if (typeof brushColor === 'string') {
+          const hex = brushColor.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+          brushEngineRef.current.setColor(r, g, b);
+      } else {
+          brushEngineRef.current.setColor(brushColor.r, brushColor.g, brushColor.b);
+      }
     }
-  }, [color]);
+  }, [brushColor]);
 
   useEffect(() => {
     if (brushEngineRef.current && brushSize) {
@@ -143,10 +154,10 @@ export const CanvasArea = forwardRef<CanvasAreaHandles, CanvasAreaProps>(({ onDr
   }, [brushSize]);
 
   useEffect(() => {
-    if (brushEngineRef.current && opacity !== undefined) {
-        brushEngineRef.current.setOpacity(opacity);
+    if (brushEngineRef.current && brushOpacity !== undefined) {
+        brushEngineRef.current.setOpacity(brushOpacity);
     }
-  }, [opacity]);
+  }, [brushOpacity]);
 
   useEffect(() => {
     if (brushEngineRef.current && studioSettings) {

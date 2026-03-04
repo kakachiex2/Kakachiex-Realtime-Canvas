@@ -12,6 +12,8 @@ import { useFal } from '@/hooks/useFal';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { defaultWorkflow } from './defaultWorkflow';
 import { DEFAULT_BRUSH_STUDIO_SETTINGS, type BrushStudioSettings } from './utils/brushStudioSettings';
+import { deriveStudioSettingsFromBrush } from './utils/mybToStudio';
+import { BrushEngine } from './utils/BrushEngine';
 
 const PRESETS: Record<string, string> = {
   studio: "product design sketch material, industrial design material, clean lighting, realistic material, white soft illumination background",
@@ -36,7 +38,7 @@ function App() {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [brushStudioOpen, setBrushStudioOpen] = useState(false);
   const [activeBrush, setActiveBrush] = useState("pencil");
-  const [brushStudioSettings, setBrushStudioSettings] = useState<BrushStudioSettings>(DEFAULT_BRUSH_STUDIO_SETTINGS);
+  const [brushSettingsMap, setBrushSettingsMap] = useState<Record<string, BrushStudioSettings>>({});
   const [activeCustomStyle, setActiveCustomStyle] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState(3);
   const [brushOpacity, setBrushOpacity] = useState(1.0);
@@ -61,6 +63,22 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Synchronize pristine MyPaint JS parameters into Brush Studio Sliders
+  useEffect(() => {
+    setBrushSettingsMap(prev => {
+      // Preserve user settings if already configured
+      if (prev[activeBrush]) return prev;
+
+      // Unpack pristine brush config and reverse-map its curves back to 0-100 UI sliders
+      const preset = BrushEngine.presets.find(p => p.name === activeBrush);
+      if (preset) {
+        const derived = deriveStudioSettingsFromBrush(preset.setting);
+        return { ...prev, [activeBrush]: derived };
+      }
+      return prev;
+    });
+  }, [activeBrush]);
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -195,9 +213,9 @@ function App() {
         <BrushStudio
           isOpen={brushStudioOpen}
           brushName={activeBrush}
-          settings={brushStudioSettings}
+          settings={brushSettingsMap[activeBrush] ?? DEFAULT_BRUSH_STUDIO_SETTINGS}
           onDone={(settings: BrushStudioSettings) => {
-             setBrushStudioSettings(settings);
+             setBrushSettingsMap(prev => ({ ...prev, [activeBrush]: settings }));
              setBrushStudioOpen(false);
           }}
           onCancel={() => setBrushStudioOpen(false)}
@@ -246,12 +264,13 @@ function App() {
                 <CanvasArea 
                     ref={canvasRef} 
                     onDraw={onDraw} 
-                    color={canvasColor} 
+                    canvasColor={canvasColor} 
+                    brushColor={theme === 'light' ? '#000000' : '#ffffff'}
                     brushSize={brushSize}
                     activeBrush={activeBrush}
-                    opacity={brushOpacity}
+                    brushOpacity={brushOpacity}
                     onHistoryChange={handleHistoryChange}
-                    studioSettings={brushStudioSettings}
+                    studioSettings={brushSettingsMap[activeBrush] ?? DEFAULT_BRUSH_STUDIO_SETTINGS}
                 />
              </div>
         </div>
